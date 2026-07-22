@@ -1,0 +1,4264 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Logistics System</title>
+    <link href="font.css" rel="stylesheet">
+
+    <script src="mqttws31.min.js"></script>
+
+    <style>
+        /* ================= 1. RESET & LAYOUT DASAR ================= */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ================= 2. SIDEBAR ================= */
+        .sidebar {
+            width: 80px;
+            background-color: #e9ecef;
+            border-right: 2px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .logo-box {
+            margin-bottom: 40px;
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .icon-btn:hover,
+        .icon-btn.active {
+            background-color: #d1d5db;
+        }
+
+        .icon {
+            font-size: 24px;
+            color: #555;
+        }
+
+        .spacer {
+            flex-grow: 1;
+        }
+
+        /* ================= 3. AREA UTAMA & HEADER ================= */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+        }
+
+        .top-navbar {
+            height: 80px;
+            border-bottom: 2px solid #dee2e6;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+        }
+
+        .sys-title {
+            font-weight: 700;
+            font-size: 22px;
+            color: #000;
+            white-space: nowrap;
+        }
+
+        .search-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ================= STATUS FILTER (pengganti search bar) ================= */
+        .status-filter {
+            display: flex;
+            background: #f0ece6;
+            padding: 5px;
+            border-radius: 30px;
+            gap: 3px;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover:not(.active) {
+            color: #555;
+        }
+
+        .filter-btn.active {
+            background: #ffffff;
+            color: #333;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
+        }
+
+        /* Warna dot sesuai status di setiap filter button */
+        .filter-btn.active[data-filter="On Going"] {
+            color: #1565c0;
+        }
+
+        .filter-btn.active[data-filter="Paused"] {
+            color: #e65100;
+        }
+
+        .filter-btn.active[data-filter="Completed"] {
+            color: #2e7d32;
+        }
+
+        .filter-btn.active[data-filter="Aborted"] {
+            color: #757575;
+        }
+
+        .user-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .bell-icon {
+            font-size: 20px;
+            cursor: pointer;
+            transition: 0.3s ease-in-out;
+            display: inline-block;
+            user-select: none;
+            width: 30px;
+            height: 35px;
+        }
+
+        /* ================= NOTIFICATION BELL ================= */
+        .notif-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .notif-bell-btn {
+            position: relative;
+            background: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            line-height: 0;
+        }
+
+        .notif-bell-btn:hover .bell-icon {
+            transform: scale(1.1);
+        }
+
+        /* Badge merah dengan angka unread */
+        .notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            padding: 0 4px;
+            border: 2px solid #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: content-box;
+            line-height: 1;
+        }
+
+        /* Dropdown Panel */
+        .notif-panel {
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 0;
+            width: 340px;
+            max-height: 420px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            overflow: hidden;
+            display: flex !important;
+            flex-direction: column;
+            animation: slideDown 0.2s ease;
+        }
+
+        .notif-panel[style*="display:none"],
+        .notif-panel[style*="display: none"] {
+            display: none !important;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .notif-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 18px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .notif-panel-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #222;
+        }
+
+        .notif-mark-all {
+            background: transparent;
+            border: none;
+            color: #1565c0;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .notif-mark-all:hover {
+            background: #e3f2fd;
+        }
+
+        .notif-mark-all:disabled {
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .notif-mark-all:disabled:hover {
+            background: transparent;
+        }
+
+        /* List */
+        .notif-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .notif-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .notif-list::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        /* Notification Item */
+        .notif-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 18px;
+            cursor: pointer;
+            border-bottom: 1px solid #f5f5f5;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .notif-item:hover {
+            background: #fafafa;
+        }
+
+        .notif-item.unread {
+            background: #f0f7ff;
+        }
+
+        .notif-item.unread:hover {
+            background: #e3f2fd;
+        }
+
+        /* Unread dot indicator */
+        .notif-item.unread::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #1565c0;
+        }
+
+        .notif-icon {
+            flex: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .notif-icon.assigned {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .notif-icon.completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .notif-icon.aborted {
+            background: #fafafa;
+            color: #757575;
+        }
+
+        .notif-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notif-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #222;
+            margin-bottom: 2px;
+        }
+
+        .notif-time {
+            font-size: 11px;
+            color: #888;
+        }
+
+        /* Empty state */
+        .notif-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .notif-empty-icon {
+            font-size: 36px;
+            opacity: 0.4;
+            margin-bottom: 8px;
+        }
+
+        .profile-pic {
+            width: 45px;
+            height: 45px;
+            border-radius: 0%;
+            background-image: url('logo_inacos.png');
+
+        }
+
+        .profile-pic img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* ================= 4. KONTEN HALAMAN ================= */
+        .page-section {
+            padding: 40px;
+            overflow-y: auto;
+            height: calc(100vh - 80px);
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #111;
+        }
+
+        /* ================= 5. PAGE ADD ORDER ================= */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .card.selected {
+            border-color: #c4a484;
+            background-color: #faf5f0;
+        }
+
+        .card-id {
+            font-size: 13px;
+            color: #777;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 10px 0;
+            height: 40px;
+        }
+
+        .card-stock {
+            font-size: 12.5px;
+            color: #718096;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .qty-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #c4a484;
+            border-radius: 30px;
+            padding: 5px;
+            width: 110px;
+            margin: 0 auto;
+        }
+
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid #c4a484;
+            background: none;
+            color: #c4a484;
+            cursor: pointer;
+        }
+
+        .qty-value {
+            font-weight: bold;
+            width: 30px;
+            text-align: center;
+        }
+
+        /* Menghilangkan panah spinner bawaan browser */
+        input.qty-value::-webkit-outer-spin-button,
+        input.qty-value::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            appearance: none;
+            margin: 0;
+        }
+
+        input.qty-value {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .btn-assign {
+            background-color: #bca085;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 15px 60px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-assign:hover {
+            background-color: #a68b70;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(188, 160, 133, 0.4);
+        }
+
+        /* Container untuk button Assign Order - centerkan tombol secara horizontal */
+        .action-area {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        /* ================= 6. PAGE ORDER LIST ================= */
+        .order-item-card {
+            background: #fff;
+            border: 1px solid #eee;
+            padding: 20px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
+
+        /* ================= ORDER TYPE SELECTOR ================= */
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .order-header h1 {
+            margin: 0;
+        }
+
+        .order-type-selector {
+            display: flex;
+            align-items: center;
+        }
+
+        .type-options {
+            display: flex;
+            background: #e8d5be;
+            padding: 5px;
+            border-radius: 30px;
+            gap: 2px;
+        }
+
+        .type-btn {
+            background: transparent;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #8b6f50;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .type-btn:hover:not(.active) {
+            color: #5e4a32;
+        }
+
+        .type-btn.active {
+            background: #a67c52;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+
+        /* ================= STATUS TAG COLORS ================= */
+        /* Status tag di order list (item card) */
+        .order-status-tag {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .order-status-tag.ongoing {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        /* Biru = sedang berjalan */
+        .order-status-tag.completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        /* Hijau = selesai sukses */
+        .order-status-tag.paused {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        /* Oranye lembut = paused */
+        .order-status-tag.aborted {
+            background: #ea9f9f;
+            color: #910e0e;
+        }
+
+        /* Abu = dibatalkan */
+
+        /* Status besar di order detail (stat box) */
+        .val-order-status {
+            font-size: 24px;
+            font-weight: 700;
+            transition: color 0.3s ease;
+        }
+
+        .val-order-status.ongoing {
+            color: #1565c0;
+        }
+
+        /* Biru */
+        .val-order-status.completed {
+            color: #2e7d32;
+        }
+
+        /* Hijau */
+        .val-order-status.paused {
+            color: #e65100;
+        }
+
+        /* Oranye */
+        .val-order-status.aborted {
+            color: #757575;
+        }
+
+        /* Abu */
+
+        /* Empty state untuk Active Orders */
+        .empty-order-state {
+            background: #fff;
+            border: 2px dashed #d9d9d9;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            color: #999;
+        }
+
+        .empty-order-state .empty-icon {
+            font-size: 56px;
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        .empty-order-state .empty-text {
+            font-size: 20px;
+            font-weight: 600;
+            color: #555;
+            margin: 0 0 8px 0;
+        }
+
+        .empty-order-state .empty-subtext {
+            font-size: 14px;
+            color: #999;
+            margin: 0;
+        }
+
+        /* ================= MODAL KONFIRMASI ================= */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-box {
+            background: #fff;
+            border-radius: 20px;
+            padding: 35px 40px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-icon {
+            font-size: 56px;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 12px 0;
+            color: #222;
+        }
+
+        .modal-text {
+            font-size: 15px;
+            color: #666;
+            margin: 0 0 25px 0;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .modal-btn-cancel {
+            background: #f0f0f0;
+            color: #555;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .modal-btn-confirm {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            background: #b71c1c;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ================= TOAST NOTIFICATION ================= */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #fff;
+            padding: 14px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 240px;
+            max-width: 360px;
+            border-left: 4px solid #999;
+            animation: slideInRight 0.3s ease;
+        }
+
+        .toast.success {
+            border-left-color: #2e7d32;
+            color: #2e7d32;
+        }
+
+        .toast.error {
+            border-left-color: #c62828;
+            color: #c62828;
+        }
+
+        .toast.info {
+            border-left-color: #1565c0;
+            color: #1565c0;
+        }
+
+        .toast.fade-out {
+            animation: slideOutRight 0.3s ease forwards;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+        }
+
+        /* ================= CLEAR ALL BUTTON ================= */
+        .btn-clear-all {
+            background: transparent;
+            color: #c62828;
+            border: 1.5px solid #c62828;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-clear-all:hover {
+            background: #c62828;
+            color: white;
+        }
+
+        .btn-clear-all:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-clear-all:disabled:hover {
+            background: transparent;
+            color: #c62828;
+        }
+
+        /* ================= FILTER & BACK BUTTON CONTAINER ================= */
+        .filter-back-container {
+            display: grid;
+            place-items: center;
+        }
+
+        .filter-back-container>* {
+            grid-area: 1 / 1;
+        }
+
+        .btn-back {
+            background: transparent;
+            color: #2c2c2c;
+            border: 2px solid #bbb;
+            padding: 11px 26px;
+            /* Diperbesar sedikit */
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 16.5px;
+            /* Diperbesar dari 14.5px */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            /* Jarak antara panah dan teks diperbesar */
+            justify-self: end;
+        }
+
+        .btn-back:hover {
+            background: #eee;
+            color: #111;
+            border-color: #999;
+        }
+
+        /* ================= 8. WAREHOUSE DASHBOARD (page-home) ================= */
+        .dashboard-header {
+            margin-bottom: 30px;
+        }
+
+        .dashboard-subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-top: -20px;
+            margin-bottom: 25px;
+        }
+
+        .dashboard-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid #eee;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .summary-card .card-icon {
+            font-size: 24px;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-ongoing .card-icon {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .card-completed .card-icon {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .card-aborted .card-icon {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .card-total .card-icon {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .summary-card .card-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-card .card-label {
+            font-size: 13px;
+            color: #888;
+            font-weight: 600;
+        }
+
+        .summary-card .card-val {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111;
+            margin: 4px 0 0 0;
+        }
+
+        .dashboard-sections {
+            display: flex;
+            gap: 25px;
+        }
+
+        .dashboard-block {
+            background: #fff;
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid #eee;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+            flex: 1;
+        }
+
+        .dashboard-block h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .recent-orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .recent-order-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            background: #faf9f6;
+            border-radius: 12px;
+            border: 1px solid #f0ece6;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .recent-order-row:hover {
+            background: #f5f0e8;
+            border-color: #dcd4c9;
+            transform: translateX(4px);
+        }
+
+        .recent-order-row .order-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .recent-order-row .order-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #111;
+        }
+
+        .recent-order-row .order-desc {
+            font-size: 12px;
+            color: #777;
+        }
+
+        .block-stats {
+            max-width: 380px;
+        }
+
+        .completion-rate-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 0;
+        }
+
+        .circular-progress-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+
+        .circular-progress-wrapper .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 22px;
+            font-weight: 700;
+            color: #111;
+        }
+
+        .progress-stats-info {
+            text-align: center;
+        }
+
+        .progress-stats-info p {
+            margin: 0;
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .progress-stats-info small {
+            color: #777;
+            font-size: 12px;
+            margin-top: 4px;
+            display: block;
+        }
+
+        /* ================= ORDER LIST HEADER LAYOUT ================= */
+        .order-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .order-list-header h1 {
+            margin: 0;
+        }
+
+        .order-list-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Override margin-bottom yang dari .btn-order biar align dengan Clear All */
+        .order-list-actions .btn-order {
+            margin-bottom: 0;
+        }
+
+        /* ================= 7. PAGE ORDER DETAIL (DASHBOARD) ================= */
+        .dashboard-grid {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
+
+        .map-card {
+            flex: 1;
+            background: #a96c2e;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #eee;
+            text-align: center;
+        }
+
+        .map-image-dummy {
+            width: 100%;
+            max-width: 400px;
+            height: 400px;
+            object-fit: cover;
+            border-radius: 15px;
+            background-color: #eee;
+        }
+
+        .stats-container {
+            flex: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: #fff;
+            padding: 20px;
+            border-radius: 18px;
+            border: 1px solid #eee;
+            box-shadow: 10 50px 50px rgba(0, 0, 0, 0.02);
+            height: fit-content;
+        }
+
+        .stat-box label {
+            font-size: 13px;
+            color: #888;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .stat-box .val {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111;
+        }
+
+        .status-green {
+            color: #28a745;
+        }
+
+        .judul-checkpoint {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+            color: #4d4d4d;
+        }
+
+        .checkpoint-card {
+            background: #fff;
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid #eee;
+            height: fit-content;
+            text-align: center;
+        }
+
+        .path-sequence {
+            font-size: 20px;
+            font-weight: 500;
+            color: #000000;
+            text-align: center;
+        }
+
+        .active-node {
+            color: #21aa0f;
+            font-weight: 1200;
+        }
+
+        .detail-actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .btn-pause,
+        .btn-force,
+        .btn-simulate {
+            flex: none;
+            width: 170px;
+            padding: 15px;
+            border-radius: 15px;
+            border: none;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-pause {
+            background-color: #007bff;
+        }
+
+        .btn-force {
+            background-color: #76e129;
+        }
+
+        .btn-simulate {
+            background-color: #a855f7;
+        }
+
+        .btn-pause:hover,
+        .btn-force:hover,
+        .btn-simulate:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .btn-pause:disabled,
+        .btn-force:disabled,
+        .btn-simulate:disabled,
+        .btn-abort:disabled {
+            background-color: #cccccc !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-pause:disabled:hover,
+        .btn-force:disabled:hover,
+        .btn-abort:disabled:hover {
+            transform: none;
+            opacity: 0.6;
+        }
+
+        /* ================= ITEMS BREAKDOWN CARD ================= */
+        .items-breakdown-card {
+            background: #fff;
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid #eee;
+            height: fit-content;
+        }
+
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 240px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .items-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .items-list::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fafafa;
+            border-radius: 12px;
+            border-left: 3px solid #c4986b;
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .item-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .item-meta {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .item-qty {
+            background: #c4986b;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 13px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .items-empty {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        .btn-abort {
+            background: #ff0000;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .btn-order {
+            background: #c38705;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .action-container {
+            display: flex;
+            justify-content: flex-end;
+            width: 100%;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .detail-title {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .icon-btn {
+            width: 65px;
+            height: 65px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: 0.3s;
+            gap: 4px;
+        }
+
+        .icon-btn img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            opacity: 0.6;
+            transition: 0.3s;
+        }
+
+        .icon-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #666;
+            transition: 0.3s;
+        }
+
+        .icon-btn:hover {
+            background-color: #e2e8f0;
+        }
+
+        .icon-btn:hover img,
+        .icon-btn.active img {
+            opacity: 1;
+        }
+
+        .icon-btn:hover .icon-label,
+        .icon-btn.active .icon-label {
+            color: #111;
+            font-weight: 700;
+        }
+
+        .icon-btn.active {
+            background-color: #d1d5db;
+        }
+
+        .icon-btn:hover .custom-icon,
+        .icon-btn.active .custom-icon {
+            opacity: 1;
+        }
+
+        .current-node-box {
+            margin-top: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            background: #e8f5e9;
+            border: 2px solid #28a745;
+            border-radius: 30px;
+            box-shadow: 0 0 12px rgba(40, 167, 69, .20);
+        }
+
+        .current-node-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #28a745;
+        }
+
+        .current-node-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .current-node-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: #28a745;
+        }
+
+        .amr-status-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 14px;
+            background: #f0f4ff;
+            border: 1px solid #c4d0f5;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .amr-status-label {
+            color: #5a6b9a;
+            font-weight: 600;
+        }
+
+        .amr-status-value {
+            color: #2b4dd1;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <div class="logo-box" onclick="bukaHalaman('home')">
+            <img src="logo_ils.png" alt="Inacos Logo"
+                style="width: 110px; height: auto; margin-bottom: 20px; margin-left: 5px; cursor: pointer;">
+        </div>
+
+        <div class="icon-btn" id="nav-home" onclick="bukaHalaman('home')">
+            <img src="home.png" alt="Home" class="custom-icon">
+            <span class="icon-label">Home</span>
+        </div>
+
+        <div class="icon-btn active" id="nav-order" onclick="bukaHalaman('order')">
+            <img src="trolley.png" alt="Order" class="custom-icon">
+            <span class="icon-label">Assign</span>
+        </div>
+
+        <div class="icon-btn" id="nav-order-list" onclick="bukaHalaman('order-list')">
+            <img src="orderlist.png" alt="Orderlist" class="custom-icon">
+            <span class="icon-label">Order List</span>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-navbar">
+            <div class="sys-title">Integrated Logistics System</div>
+            <div class="search-container">
+                <div class="filter-back-container">
+                    <button class="btn-back" id="btn-back"
+                        onclick="bukaHalaman(window.halamanAsalDetail || 'order-list')" style="visibility: hidden;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Back
+                    </button>
+                    <div class="status-filter" id="status-filter">
+                        <button class="filter-btn active" data-filter="All" onclick="pilihFilter('All')">All</button>
+                        <button class="filter-btn" data-filter="On Going" onclick="pilihFilter('On Going')">On
+                            Going</button>
+                        <button class="filter-btn" data-filter="Paused" onclick="pilihFilter('Paused')">Paused</button>
+                        <button class="filter-btn" data-filter="Completed"
+                            onclick="pilihFilter('Completed')">Completed</button>
+                        <button class="filter-btn" data-filter="Aborted"
+                            onclick="pilihFilter('Aborted')">Aborted</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-actions">
+                <!-- Notification Bell with Dropdown -->
+                <div class="notif-wrapper">
+                    <button class="notif-bell-btn" id="notif-bell-btn" onclick="toggleNotifPanel(event)"
+                        aria-label="Notifications">
+                        <img src="notification.png" class="bell-icon" alt="Notif">
+                        <span class="notif-badge" id="notif-badge" style="display:none;">0</span>
+                    </button>
+
+                    <!-- Dropdown Panel -->
+                    <div class="notif-panel" id="notif-panel" style="display:none;">
+                        <div class="notif-panel-header">
+                            <span class="notif-panel-title">Notifications</span>
+                            <button class="notif-mark-all" id="notif-mark-all" onclick="tandaiSemuaNotifDibaca()">Mark
+                                all as read</button>
+                        </div>
+                        <div class="notif-list" id="notif-list">
+                            <!-- Diisi oleh renderNotifikasi() -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-pic">
+                    <img src="logo_inacos.png" alt="Profile">
+                </div>
+            </div>
+        </div>
+
+        <div id="page-home" class="page-section" style="display: none;">
+            <div class="dashboard-header">
+                <h1>Welcome Fellas</h1>
+                <div class="dashboard-subtitle">Pick to Light - Warehouse Management System - INACOS Laboratory</div>
+            </div>
+
+            <!-- Summary Cards Grid -->
+            <div class="dashboard-summary-grid">
+                <!-- Ongoing / Paused Orders Card -->
+                <div class="summary-card card-ongoing">
+                    <div class="card-icon">⏳</div>
+                    <div class="card-info">
+                        <span class="card-label">Active Orders</span>
+                        <div class="card-val" id="summary-ongoing">0</div>
+                    </div>
+                </div>
+
+                <!-- Completed Orders Card -->
+                <div class="summary-card card-completed">
+                    <div class="card-icon">✅</div>
+                    <div class="card-info">
+                        <span class="card-label">Completed Orders</span>
+                        <div class="card-val" id="summary-completed">0</div>
+                    </div>
+                </div>
+
+                <!-- Aborted Orders Card -->
+                <div class="summary-card card-aborted">
+                    <div class="card-icon">❌</div>
+                    <div class="card-info">
+                        <span class="card-label">Aborted Orders</span>
+                        <div class="card-val" id="summary-aborted">0</div>
+                    </div>
+                </div>
+
+                <!-- Total Orders Card -->
+                <div class="summary-card card-total">
+                    <div class="card-icon">📦</div>
+                    <div class="card-info">
+                        <span class="card-label">Total Orders</span>
+                        <div class="card-val" id="summary-total">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Columns / Sections -->
+            <div class="dashboard-sections">
+                <!-- Recent Orders Block -->
+                <div class="dashboard-block">
+                    <h3>Recent Orders</h3>
+                    <div class="recent-orders-list" id="dashboard-recent-orders">
+                        <!-- Diisi oleh updateDashboardSummary() -->
+                    </div>
+                </div>
+
+                <!-- Completion Stats Block -->
+                <div class="dashboard-block block-stats">
+                    <h3>Order Completion Rate</h3>
+                    <div class="completion-rate-container">
+                        <div class="circular-progress-wrapper">
+                            <svg class="progress-ring" width="120" height="120">
+                                <!-- Background Circle -->
+                                <circle class="progress-ring__circle" stroke="#f3f4f6" stroke-width="8"
+                                    fill="transparent" r="50" cx="60" cy="60" />
+                                <!-- Active Progress Circle -->
+                                <circle id="progress-circle" class="progress-ring__circle" stroke="#7b1fa2"
+                                    stroke-width="8" fill="transparent" r="50" cx="60" cy="60" />
+                            </svg>
+                            <div class="progress-text" id="progress-percent">0%</div>
+                        </div>
+                        <div class="progress-stats-info">
+                            <p id="progress-ratio">0 of 0 orders finished</p>
+                            <small>Real-time metrics from local database</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-order" class="page-section" style="display: block;">
+            <div class="order-header">
+                <h1>Add Order</h1>
+                <div class="order-type-selector">
+                    <div class="type-options">
+                        <button type="button" class="type-btn active" data-type="Put-Away"
+                            onclick="pilihOrderType('Put-Away')">
+                            Put-Away
+                        </button>
+                        <button type="button" class="type-btn" data-type="Picking" onclick="pilihOrderType('Picking')">
+                            Picking
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="cards-grid">
+                <!-- ================= NODE A1 ================= -->
+                <div class="card" id="card-A1-1">
+                    <div class="card-id">A1-1 (SA-001)</div>
+                    <div class="card-title">Sensor Ultrasonik</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-1', 'qty-A1-1', -1)">−</button><span class="qty-value"
+                            id="qty-A1-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-1', 'qty-A1-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A1-2">
+                    <div class="card-id">A1-2 (SA-002)</div>
+                    <div class="card-title">Sensor IR Obstacle</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-2', 'qty-A1-2', -1)">−</button><span class="qty-value"
+                            id="qty-A1-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-2', 'qty-A1-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A1-3">
+                    <div class="card-id">A1-3 (SA-003)</div>
+                    <div class="card-title">Encoder Rotary</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-3', 'qty-A1-3', -1)">−</button><span class="qty-value"
+                            id="qty-A1-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-3', 'qty-A1-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A1-4">
+                    <div class="card-id">A1-4 (SA-004)</div>
+                    <div class="card-title">Servo Motor SG90</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-4', 'qty-A1-4', -1)">−</button><span class="qty-value"
+                            id="qty-A1-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A1-4', 'qty-A1-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE A2 ================= -->
+                <div class="card" id="card-A2-1">
+                    <div class="card-id">A2-1 (SA-005)</div>
+                    <div class="card-title">Sensor Suhu DHT11</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-1', 'qty-A2-1', -1)">−</button><span class="qty-value"
+                            id="qty-A2-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-1', 'qty-A2-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A2-2">
+                    <div class="card-id">A2-2 (SA-006)</div>
+                    <div class="card-title">Modul RTC DS3231</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-2', 'qty-A2-2', -1)">−</button><span class="qty-value"
+                            id="qty-A2-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-2', 'qty-A2-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A2-3">
+                    <div class="card-id">A2-3 (SA-007)</div>
+                    <div class="card-title">Relay 5V 1 Channel</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-3', 'qty-A2-3', -1)">−</button><span class="qty-value"
+                            id="qty-A2-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-3', 'qty-A2-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A2-4">
+                    <div class="card-id">A2-4 (SA-008)</div>
+                    <div class="card-title">Modul MPU6050</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-4', 'qty-A2-4', -1)">−</button><span class="qty-value"
+                            id="qty-A2-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A2-4', 'qty-A2-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE A3 ================= -->
+                <div class="card" id="card-A3-1">
+                    <div class="card-id">A3-1 (SA-009)</div>
+                    <div class="card-title">Modul RFID RC522</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-1', 'qty-A3-1', -1)">−</button><span class="qty-value"
+                            id="qty-A3-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-1', 'qty-A3-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A3-2">
+                    <div class="card-id">A3-2 (SA-010)</div>
+                    <div class="card-title">Joystick Module</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-2', 'qty-A3-2', -1)">−</button><span class="qty-value"
+                            id="qty-A3-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-2', 'qty-A3-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A3-3">
+                    <div class="card-id">A3-3 (SA-011)</div>
+                    <div class="card-title">LCD I2C 16x2</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-3', 'qty-A3-3', -1)">−</button><span class="qty-value"
+                            id="qty-A3-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-3', 'qty-A3-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A3-4">
+                    <div class="card-id">A3-4 (SA-012)</div>
+                    <div class="card-title">Sensor LDR Cahaya</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-4', 'qty-A3-4', -1)">−</button><span class="qty-value"
+                            id="qty-A3-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A3-4', 'qty-A3-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE A4 ================= -->
+                <div class="card" id="card-A4-1">
+                    <div class="card-id">A4-1 (SA-013)</div>
+                    <div class="card-title">Modul Bluetooth HC05</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-1', 'qty-A4-1', -1)">−</button><span class="qty-value"
+                            id="qty-A4-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-1', 'qty-A4-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A4-2">
+                    <div class="card-id">A4-2 (SA-014)</div>
+                    <div class="card-title">Sensor Warna TCS3200</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-2', 'qty-A4-2', -1)">−</button><span class="qty-value"
+                            id="qty-A4-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-2', 'qty-A4-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A4-3">
+                    <div class="card-id">A4-3 (SA-015)</div>
+                    <div class="card-title">Sensor Gas MQ-2</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-3', 'qty-A4-3', -1)">−</button><span class="qty-value"
+                            id="qty-A4-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-3', 'qty-A4-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-A4-4">
+                    <div class="card-id">A4-4 (SA-016)</div>
+                    <div class="card-title">Modul Load Cell</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-4', 'qty-A4-4', -1)">−</button><span class="qty-value"
+                            id="qty-A4-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-A4-4', 'qty-A4-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE B1 ================= -->
+                <div class="card" id="card-B1-1">
+                    <div class="card-id">B1-1 (MK-001)</div>
+                    <div class="card-title">Bearing 608ZZ</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-1', 'qty-B1-1', -1)">−</button><span class="qty-value"
+                            id="qty-B1-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-1', 'qty-B1-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B1-2">
+                    <div class="card-id">B1-2 (MK-002)</div>
+                    <div class="card-title">Pulley GT2 20T</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-2', 'qty-B1-2', -1)">−</button><span class="qty-value"
+                            id="qty-B1-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-2', 'qty-B1-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B1-3">
+                    <div class="card-id">B1-3 (MK-003)</div>
+                    <div class="card-title">Linear Rail 300mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-3', 'qty-B1-3', -1)">−</button><span class="qty-value"
+                            id="qty-B1-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-3', 'qty-B1-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B1-4">
+                    <div class="card-id">B1-4 (MK-004)</div>
+                    <div class="card-title">Timing Belt GT2</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-4', 'qty-B1-4', -1)">−</button><span class="qty-value"
+                            id="qty-B1-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B1-4', 'qty-B1-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE B2 ================= -->
+                <div class="card" id="card-B2-1">
+                    <div class="card-id">B2-1 (MK-005)</div>
+                    <div class="card-title">Baut M3 x 10mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-1', 'qty-B2-1', -1)">−</button><span class="qty-value"
+                            id="qty-B2-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-1', 'qty-B2-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B2-2">
+                    <div class="card-id">B2-2 (MK-006)</div>
+                    <div class="card-title">Mur M3 Stainless</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-2', 'qty-B2-2', -1)">−</button><span class="qty-value"
+                            id="qty-B2-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-2', 'qty-B2-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B2-3">
+                    <div class="card-id">B2-3 (MK-007)</div>
+                    <div class="card-title">Spacer Kuningan M3</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-3', 'qty-B2-3', -1)">−</button><span class="qty-value"
+                            id="qty-B2-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-3', 'qty-B2-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B2-4">
+                    <div class="card-id">B2-4 (MK-008)</div>
+                    <div class="card-title">Alum. Profile 2020</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-4', 'qty-B2-4', -1)">−</button><span class="qty-value"
+                            id="qty-B2-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B2-4', 'qty-B2-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE B3 ================= -->
+                <div class="card" id="card-B3-1">
+                    <div class="card-id">B3-1 (MK-009)</div>
+                    <div class="card-title">Roda Omni 58mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-1', 'qty-B3-1', -1)">−</button><span class="qty-value"
+                            id="qty-B3-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-1', 'qty-B3-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B3-2">
+                    <div class="card-id">B3-2 (MK-010)</div>
+                    <div class="card-title">Besi Shaft 8mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-2', 'qty-B3-2', -1)">−</button><span class="qty-value"
+                            id="qty-B3-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-2', 'qty-B3-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B3-3">
+                    <div class="card-id">B3-3 (MK-011)</div>
+                    <div class="card-title">Coupler 5x8mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-3', 'qty-B3-3', -1)">−</button><span class="qty-value"
+                            id="qty-B3-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-3', 'qty-B3-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B3-4">
+                    <div class="card-id">B3-4 (MK-012)</div>
+                    <div class="card-title">Gear Plastik Set</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-4', 'qty-B3-4', -1)">−</button><span class="qty-value"
+                            id="qty-B3-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B3-4', 'qty-B3-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE B4 ================= -->
+                <div class="card" id="card-B4-1">
+                    <div class="card-id">B4-1 (MK-013)</div>
+                    <div class="card-title">V-Wheel Pom</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-1', 'qty-B4-1', -1)">−</button><span class="qty-value"
+                            id="qty-B4-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-1', 'qty-B4-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B4-2">
+                    <div class="card-id">B4-2 (MK-014)</div>
+                    <div class="card-title">Lead Screw T8</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-2', 'qty-B4-2', -1)">−</button><span class="qty-value"
+                            id="qty-B4-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-2', 'qty-B4-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B4-3">
+                    <div class="card-id">B4-3 (MK-015)</div>
+                    <div class="card-title">Motor Stepper Nema17</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-3', 'qty-B4-3', -1)">−</button><span class="qty-value"
+                            id="qty-B4-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-3', 'qty-B4-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-B4-4">
+                    <div class="card-id">B4-4 (MK-016)</div>
+                    <div class="card-title">Bracket Nema 17</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-4', 'qty-B4-4', -1)">−</button><span class="qty-value"
+                            id="qty-B4-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-B4-4', 'qty-B4-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE C1 ================= -->
+                <div class="card" id="card-C1-1">
+                    <div class="card-id">C1-1 (EL-001)</div>
+                    <div class="card-title">Resistor 10K Ohm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-1', 'qty-C1-1', -1)">−</button><span class="qty-value"
+                            id="qty-C1-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-1', 'qty-C1-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C1-2">
+                    <div class="card-id">C1-2 (EL-002)</div>
+                    <div class="card-title">Kapasitor 100uF</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-2', 'qty-C1-2', -1)">−</button><span class="qty-value"
+                            id="qty-C1-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-2', 'qty-C1-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C1-3">
+                    <div class="card-id">C1-3 (EL-003)</div>
+                    <div class="card-title">LED Merah 5mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-3', 'qty-C1-3', -1)">−</button><span class="qty-value"
+                            id="qty-C1-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-3', 'qty-C1-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C1-4">
+                    <div class="card-id">C1-4 (EL-004)</div>
+                    <div class="card-title">Transistor 2N2222</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-4', 'qty-C1-4', -1)">−</button><span class="qty-value"
+                            id="qty-C1-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C1-4', 'qty-C1-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE C2 ================= -->
+                <div class="card" id="card-C2-1">
+                    <div class="card-id">C2-1 (EL-005)</div>
+                    <div class="card-title">ESP32 Dev Module</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-1', 'qty-C2-1', -1)">−</button><span class="qty-value"
+                            id="qty-C2-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-1', 'qty-C2-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C2-2">
+                    <div class="card-id">C2-2 (EL-006)</div>
+                    <div class="card-title">Arduino Uno R3</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-2', 'qty-C2-2', -1)">−</button><span class="qty-value"
+                            id="qty-C2-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-2', 'qty-C2-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C2-3">
+                    <div class="card-id">C2-3 (EL-007)</div>
+                    <div class="card-title">Raspberry Pi 4</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-3', 'qty-C2-3', -1)">−</button><span class="qty-value"
+                            id="qty-C2-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-3', 'qty-C2-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C2-4">
+                    <div class="card-id">C2-4 (EL-008)</div>
+                    <div class="card-title">Breadboard 400 Hole</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-4', 'qty-C2-4', -1)">−</button><span class="qty-value"
+                            id="qty-C2-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C2-4', 'qty-C2-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE C3 ================= -->
+                <div class="card" id="card-C3-1">
+                    <div class="card-id">C3-1 (EL-009)</div>
+                    <div class="card-title">Kabel Jumper M-M</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-1', 'qty-C3-1', -1)">−</button><span class="qty-value"
+                            id="qty-C3-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-1', 'qty-C3-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C3-2">
+                    <div class="card-id">C3-2 (EL-010)</div>
+                    <div class="card-title">Baterai 18650</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-2', 'qty-C3-2', -1)">−</button><span class="qty-value"
+                            id="qty-C3-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-2', 'qty-C3-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C3-3">
+                    <div class="card-id">C3-3 (EL-011)</div>
+                    <div class="card-title">Modul BMS 3S</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-3', 'qty-C3-3', -1)">−</button><span class="qty-value"
+                            id="qty-C3-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-3', 'qty-C3-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C3-4">
+                    <div class="card-id">C3-4 (EL-012)</div>
+                    <div class="card-title">Step Down LM2596</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-4', 'qty-C3-4', -1)">−</button><span class="qty-value"
+                            id="qty-C3-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C3-4', 'qty-C3-4', 1)">+</button></div>
+                </div>
+
+                <!-- ================= NODE C4 ================= -->
+                <div class="card" id="card-C4-1">
+                    <div class="card-id">C4-1 (EL-013)</div>
+                    <div class="card-title">Dioda IN4007</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-1', 'qty-C4-1', -1)">−</button><span class="qty-value"
+                            id="qty-C4-1">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-1', 'qty-C4-1', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C4-2">
+                    <div class="card-id">C4-2 (EL-014)</div>
+                    <div class="card-title">IC 555 Timer</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-2', 'qty-C4-2', -1)">−</button><span class="qty-value"
+                            id="qty-C4-2">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-2', 'qty-C4-2', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C4-3">
+                    <div class="card-id">C4-3 (EL-015)</div>
+                    <div class="card-title">Push Button 12mm</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-3', 'qty-C4-3', -1)">−</button><span class="qty-value"
+                            id="qty-C4-3">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-3', 'qty-C4-3', 1)">+</button></div>
+                </div>
+                <div class="card" id="card-C4-4">
+                    <div class="card-id">C4-4 (EL-016)</div>
+                    <div class="card-title">Buzzer Aktif 5V</div>
+                    <div class="qty-container"><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-4', 'qty-C4-4', -1)">−</button><span class="qty-value"
+                            id="qty-C4-4">0</span><button class="qty-btn"
+                            onclick="ubahKuantitas('card-C4-4', 'qty-C4-4', 1)">+</button></div>
+                </div>
+
+            </div>
+            <div class="action-area"><button class="btn-assign" onclick="kirimOrder()">Assign Order</button></div>
+        </div>
+
+        <div id="page-order-list" class="page-section" style="display: none;">
+            <div class="order-list-header">
+                <h1>Active Orders</h1>
+                <div class="order-list-actions">
+                    <button class="btn-clear-all" id="btn-clear-all" onclick="deleteAllState()">Clear All</button>
+                    <button class="btn-order" onclick="bukaHalaman('order')">+ Assign Order</button>
+                </div>
+            </div>
+            <div class="order-table-container">
+                <!-- Konten diisi otomatis oleh updateTampilanOrderList().
+                     Saat daftarPesanan kosong, akan muncul empty state "There is no order". -->
+            </div>
+        </div>
+
+        <div id="page-order-detail" class="page-section" style="display: none;">
+            <div class="detail-header">
+                <h1 id="detail-title">Order #—</h1>
+                <div class="action-container">
+                    <button class="btn-abort" id="btn-abort-order" onclick="konfirmasiAbortOrder()">Abort Order</button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="map-card">
+                    <div id="canvas-container">
+                        <img src="A-01 (1).png" alt="Map" class="map-image-dummy">
+                    </div>
+                    <div class="map-footer" id="detail-order-type"
+                        style="font-weight: 700; color: #ffffff; margin-top: 15px;">— Order</div>
+                </div>
+
+                <div class="stats-container">
+
+                    <!-- Row 1: Status + Duration (data dari dashboard sendiri) -->
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <label>Order Status</label>
+                            <div class="val-order-status ongoing" id="detail-order-status">On Going</div>
+                            <small id="detail-order-status-desc">Agent is working...</small>
+                        </div>
+                        <div class="stat-box">
+                            <label>Duration</label>
+                            <div class="val" id="detail-duration">00 : 00 : 00</div>
+                            <small id="detail-created-at">Started: —</small>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Order Type + Total Items (data dari dashboard sendiri) -->
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <label>Order Type</label>
+                            <div class="val" id="detail-type-value" style="font-size: 20px;">Put-Away</div>
+                            <small id="detail-type-desc">Storing items to rack</small>
+                        </div>
+                        <div class="stat-box">
+                            <label>Total Items</label>
+                            <div class="val" id="detail-total-items">0 pcs</div>
+                            <small id="detail-items-count">across 0 racks</small>
+                        </div>
+                    </div>
+
+                    <!-- Checkpoint Path: rute hasil pathfinding (diisi renderOrderDetail) -->
+                    <div class="checkpoint-card">
+                        <div class="judul-checkpoint">Checkpoint Path</div>
+                        <div class="path-sequence" id="detail-path-sequence">Menunggu rute dari pathfinding…</div>
+                        <div id="detail-route-info"
+                            style="text-align:center; color:#555; font-size:13px; margin-top:10px;"></div>
+
+                        <div class="current-node-box" id="current-node-box">
+
+                            <div class="current-node-dot"></div>
+
+                            <span class="current-node-label">
+                                Status AMR :
+                            </span>
+
+                            <span class="current-node-value" id="current-node-value">
+                                -
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                    <!-- Items Breakdown: list semua barang yang di-order -->
+                    <div class="items-breakdown-card">
+                        <div class="judul-checkpoint">Items in Order</div>
+                        <div class="items-list" id="detail-items-list">
+                            <!-- Diisi oleh renderOrderDetail() -->
+                        </div>
+                    </div>
+                    <!-- ============ FIELD HARDWARE (HIDDEN sampai integrasi) ============
+                 Akan di-show saat integrasi MQTT dengan AGV & ESP32 sudah ready.
+                 Data yang akan diisi: Agent Status, Previous Node, Goods Counter, 
+                 Checkpoint Path, ETF, Active Node highlighting.
+
+            <div class="stats-row">
+                <div class="stat-box">
+                    <label>Agent Status</label>
+                    <div class="val" style="font-size: 20px;">Moving to B-03</div>
+                    <small>Previous: A-02</small>
+                </div>
+                <div class="stat-box">
+                    <label>Total Goods Stored</label>
+                    <div class="val">12 pcs</div>
+                    <small>Total: 48 pcs</small>
+                </div>
+            </div>
+
+            <div class="checkpoint-card">
+                <div class="judul-checkpoint">Checkpoint</div>
+                <div class="path-sequence">
+                    Base → A-02 → <span class="active-node">B-03</span> → B-02 → C-04 → C-01 → Stage
+                </div>
+                <div style="text-align: center; color: #000000; font-size: 13px; margin-top: 10px;">5 Nodes Remaining</div>
+            </div>
+            ================================================================ -->
+
+                    <div class="detail-actions">
+                        <button class="btn-pause" id="btn-pause-order" onclick="togglePauseOrder()">Pause Order</button>
+                        <button class="btn-simulate" id="btn-simulate-movement"
+                            onclick="mulaiSimulasiAGV()">Simulate</button>
+                        <button class="btn-force" id="btn-force-complete" onclick="forceCompleteOrder()">Force
+                            Complete</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div> <!-- closing main-content -->
+
+    <!-- Modal Konfirmasi Abort Order -->
+    <div id="modal-confirm-abort" class="modal-overlay" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-icon">⚠️</div>
+            <h2 class="modal-title">Abort Order?</h2>
+            <p class="modal-text">Are you sure you want to abort this order? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="batalAbortOrder()">No, Cancel</button>
+                <button class="modal-btn modal-btn-confirm" onclick="konfirmasiAbortOrderYa()">Yes, Abort</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container - posisi fixed top-right -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const mqttBroker = "192.168.0.101";
+        const mqttPort = 9001;
+        const mqttClientId = "InacosWeb_Commander_" + Math.random().toString(16).substr(2, 8);
+
+        const topicKirim = "TA_PTL_bee/Web/perintah";
+
+        const client = new Paho.MQTT.Client(mqttBroker, mqttPort, mqttClientId);
+        client.onMessageArrived = onMessageArrived;
+
+        client.onConnectionLost = function (responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log("MQTT Unconnected " + responseObject.errorMessage);
+                setTimeout(connectMQTT, 3000);
+            }
+        };
+
+        function connectMQTT() {
+            // console.log("Mencoba konek ke HiveMQ...");
+            console.log("Mencoba terhubung ke Mosquitto...");
+            client.connect({
+                useSSL: false,   // ⬅️ WAJIB untuk port 8884 (WSS - secure WebSocket)
+                onSuccess: function () {
+                    console.log("✓ Web Connected to MQTT");
+                    client.subscribe("TA_PTL_bee/#");
+                },
+                onFailure: function (err) {
+                    console.error("✗ MQTT Connect FAILED:", err.errorMessage);
+                    console.warn("Order tetap bisa disimpan secara lokal walau MQTT gagal");
+                    setTimeout(connectMQTT, 5000);  // retry setelah 5 detik
+                }
+            });
+        }
+        connectMQTT();
+
+        //LOCAL STORAGE CODE
+
+        const STORAGE_KEY = 'TA_PTL_orderlist';
+        const STORAGE_VERSION = 1;
+        function saveState() {
+            try {
+                const state = {
+                    version: STORAGE_VERSION,
+                    daftarPesanan: daftarPesanan,
+                    orderCounter: orderCounter,
+                    selectedOrderType: selectedOrderType,
+                    daftarNotifikasi: daftarNotifikasi,
+                    notifIdCounter: notifIdCounter,
+                    lastSavedAt: Date.now()
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                console.log('[Storage]State saved. Orders', daftarPesanan.length, '| Notifs', daftarNotifikasi.length);
+                updateDashboardSummary();
+            } catch (error) {
+                console.error('[Storage]State save failed:', error);
+                showNotif('Failed to save order', 'error');
+            }
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    console.log('[Storage]No saved state (first time 🤨)');
+                    updateDashboardSummary();
+                    return false;
+                }
+                const state = JSON.parse(raw);
+                if (state.version !== STORAGE_VERSION) {
+                    console.warn('[ Storage] Old version detected, ignoring saved data');
+                    updateDashboardSummary();
+                    return false;
+                }
+
+                daftarPesanan = state.daftarPesanan || [];
+                orderCounter = state.orderCounter || 1;
+                selectedOrderType = state.selectedOrderType || 'Put-Away';
+                daftarNotifikasi = state.daftarNotifikasi || [];
+                notifIdCounter = state.notifIdCounter || 1;
+
+                console.log('[Storage] State loaded. Orders:', daftarPesanan.length, '| Notifs:', daftarNotifikasi.length);
+                updateDashboardSummary();
+                return true;
+            } catch (error) {
+                console.error('[Storage]Failed to load state0', error);
+                updateDashboardSummary();
+                return false;
+            }
+        }
+
+        /**
+         * Update real-time summary cards and charts on the Warehouse Dashboard (page-home)
+         */
+        function updateDashboardSummary() {
+            const summaryOngoing = document.getElementById('summary-ongoing');
+            const summaryCompleted = document.getElementById('summary-completed');
+            const summaryAborted = document.getElementById('summary-aborted');
+            const summaryTotal = document.getElementById('summary-total');
+            const progressPercent = document.getElementById('progress-percent');
+            const progressRatio = document.getElementById('progress-ratio');
+            const progressCircle = document.getElementById('progress-circle');
+            const recentContainer = document.getElementById('dashboard-recent-orders');
+
+            if (!summaryOngoing) return; // Guard jika elemen belum dimuat
+
+            // 1. Hitung statistik
+            const total = daftarPesanan.length;
+            const ongoing = daftarPesanan.filter(o => o.status === 'On Going' || o.status === 'Paused').length;
+            const completed = daftarPesanan.filter(o => o.status === 'Completed').length;
+            const aborted = daftarPesanan.filter(o => o.status === 'Aborted').length;
+
+            summaryTotal.textContent = total;
+            summaryOngoing.textContent = ongoing;
+            summaryCompleted.textContent = completed;
+            summaryAborted.textContent = aborted;
+
+            // 2. Hitung persentase penyelesaian
+            const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+            if (progressPercent) progressPercent.textContent = completionRate + '%';
+            if (progressRatio) progressRatio.textContent = `${completed} of ${total} orders finished`;
+
+            // Update circular progress SVG
+            if (progressCircle) {
+                const radius = progressCircle.r.baseVal.value;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (completionRate / 100) * circumference;
+                progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+                progressCircle.style.strokeDashoffset = offset;
+            }
+
+            // 3. Render recent orders (maksimal 3 order terbaru)
+            if (recentContainer) {
+                if (total === 0) {
+                    recentContainer.innerHTML = `
+                        <div style="text-align: center; color: #888; padding: 30px; font-size: 13.5px;">
+                            No recent orders. Assign a new order to get started.
+                        </div>
+                    `;
+                } else {
+                    const recentOrders = [...daftarPesanan].reverse().slice(0, 3);
+                    recentContainer.innerHTML = recentOrders.map(order => {
+                        const totalQty = order.items.reduce((sum, item) => sum + item.jumlah, 0);
+                        const statusClassMap = {
+                            'On Going': 'ongoing',
+                            'Paused': 'paused',
+                            'Completed': 'completed',
+                            'Aborted': 'aborted'
+                        };
+                        const statusClass = statusClassMap[order.status] || 'ongoing';
+                        return `
+                            <div class="recent-order-row" onclick="lihatDetailOrder('${order.id}')">
+                                <div class="order-meta">
+                                    <span class="order-title">Order #${order.id}</span>
+                                    <span class="order-desc">${order.orderType || 'Put-Away'} • ${order.items.length} locations • ${totalQty} pcs total</span>
+                                </div>
+                                <span class="order-status-tag ${statusClass}">${order.status}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+
+        /**
+         Deleting the saved data & reset the state
+         When user click "clear all orders, this funcion will be called"
+         */
+        function deleteAllState() {
+            if (!confirm('Are u sure, ALL of the orders will be delete permanently')) return;
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+                daftarPesanan = [];
+                orderCounter = 1;
+                daftarNotifikasi = [];
+                notifIdCounter = 1;
+                updateTampilanOrderList();
+                renderNotifikasi();
+                updateDashboardSummary();
+                showNotif('All Orders cleared', 'success');
+            } catch (error) {
+                console.error('[Storage] State failed to delete', error);
+            }
+        }
+        //==========================
+        let daftarPesanan = [];
+        let currentOrderId = null;
+        let selectedOrderType = "Put-Away";
+        let orderCounter = 1;
+        let daftarNotifikasi = [];
+        let notifIdCounter = 1;
+        let activeFilter = 'All';  // Filter status aktif di order list
+
+        function bukaHalaman(namaHalaman, isBack = false) {
+
+            const semuaHalaman = document.querySelectorAll('.page-section');
+            semuaHalaman.forEach(hal => hal.style.display = 'none');
+            const semuaNav = document.querySelectorAll('.icon-btn');
+            semuaNav.forEach(nav => nav.classList.remove('active'));
+
+            let targetHalaman = document.getElementById('page-' + namaHalaman);
+            if (targetHalaman) {
+                targetHalaman.style.display = 'block'
+            } else {
+                console.log("Halaman page-" + namaHalaman + "page not found !");
+            }
+            let targetNav = document.getElementById('nav-' + namaHalaman);
+            if (targetNav) {
+                targetNav.classList.add('active');
+            }
+
+            if (!isBack) {
+                // Jangan ubah hash jika dijalankan dari file:/// di dalam iframe (menghindari error keamanan Chrome)
+                const isLocalFileInIframe = window.location.protocol === 'file:' && window.self !== window.top;
+                if (!isLocalFileInIframe) {
+                    try {
+                        window.location.hash = namaHalaman;
+                    } catch (e) {
+                        console.warn("Gagal mengubah hash URL:", e);
+                    }
+                }
+            }
+
+            // Hanya tampilkan filter status di halaman 'order-list' (Active Orders)
+            // Hanya tampilkan tombol Back di halaman 'order-detail' (Detail Order)
+            // Menggunakan visibility agar posisi lonceng notifikasi tidak bergeser (tetap di posisinya)
+            const filterEl = document.getElementById('status-filter');
+            const backEl = document.getElementById('btn-back');
+
+            if (filterEl) {
+                if (namaHalaman === 'order-list') {
+                    filterEl.style.visibility = 'visible';
+                } else {
+                    filterEl.style.visibility = 'hidden';
+                }
+            }
+
+            if (backEl) {
+                if (namaHalaman === 'order-detail') {
+                    backEl.style.visibility = 'visible';
+                } else {
+                    backEl.style.visibility = 'hidden';
+                }
+            }
+        }
+
+        window.addEventListener('hashchange', function () {
+            let hash = window.location.hash.replace('#', '');
+            if (hash === '') {
+                hash = 'home';
+            }
+            bukaHalaman(hash, true);
+        });
+
+        window.addEventListener('load', function () {
+
+            const availData = loadState();
+
+            if (availData) {
+                pilihOrderType(selectedOrderType);
+            }
+            // Render empty state order list saat pertama load
+            updateTampilanOrderList();
+            renderNotifikasi();  // Render bell badge & dropdown content saat load
+            // Mengubah semua span.qty-value menjadi input type="number" secara dinamis
+            document.querySelectorAll('span.qty-value').forEach(span => {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'qty-value';
+                input.id = span.id;
+                input.value = span.innerText || '0';
+                input.min = '0';
+
+                // Styling input agar menyatu dengan container
+                input.style.border = 'none';
+                input.style.outline = 'none';
+                input.style.background = 'transparent';
+                input.style.textAlign = 'center';
+                input.style.width = '35px';
+                input.style.fontWeight = 'bold';
+                input.style.fontSize = '14px';
+
+                // Event listener ketika nilai diubah secara manual
+                const cardId = span.parentNode.parentNode.id;
+                input.addEventListener('change', function () {
+                    inputKuantitas(cardId, input.id);
+                });
+
+                // Gantikan span dengan input baru
+                span.parentNode.replaceChild(input, span);
+            });
+
+            loadCabinetStock();  // Muat data stok dari database MySQL lokal
+
+            let hash = window.location.hash.replace('#', '');
+
+            if (hash !== '') {
+                bukaHalaman(hash, true);
+            } else {
+                bukaHalaman('order', true);
+            }
+        });
+
+        window.halamanAsalDetail = 'order-list';
+
+        function lihatDetailOrder(id) {
+            // Deteksi halaman asal yang aktif sebelum pindah ke detail order
+            const semuaHalaman = document.querySelectorAll('.page-section');
+            semuaHalaman.forEach(hal => {
+                if (hal.style.display === 'block' && hal.id !== 'page-order-detail') {
+                    window.halamanAsalDetail = hal.id.replace('page-', '');
+                }
+            });
+
+            currentOrderId = id;  // Track order yang sedang dilihat
+            renderOrderDetail();  // Render seluruh data detail order
+            bukaHalaman('order-detail');
+        }
+
+        // ============ STATUS MANAGEMENT FUNCTIONS ============
+
+        /**
+         * Render seluruh tampilan halaman order detail berdasarkan currentOrderId.
+         * Dipanggil saat: masuk halaman detail, status berubah, timer tick.
+         */
+        function renderOrderDetail() {
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            // 1. Title
+            document.getElementById('detail-title').innerText = "Order #" + order.id;
+
+            // 2. Order type (footer map + stat box)
+            const isPutaway = order.orderType === 'Put-Away';
+            document.getElementById('detail-order-type').innerText = order.orderType + ' Order';
+            document.getElementById('detail-type-value').innerText = order.orderType;
+            document.getElementById('detail-type-desc').innerText = isPutaway
+                ? 'Storing items to rack'
+                : 'Retrieving items from rack';
+
+            // 3. Total items (sum semua qty + jumlah rak unik)
+            const totalQty = order.items.reduce((sum, item) => sum + item.jumlah, 0);
+            const uniqueRacks = new Set(order.items.map(i => i.rak.split('-')[0])).size;
+            document.getElementById('detail-total-items').innerText = totalQty + ' pcs';
+            document.getElementById('detail-items-count').innerText =
+                `across ${order.items.length} location${order.items.length > 1 ? 's' : ''}`;
+
+            // 4. Created time + duration
+            if (order.createdAt) {
+                const tanggal = new Date(order.createdAt);
+                const jam = tanggal.toTimeString().substring(0, 5);  // HH:MM
+                document.getElementById('detail-created-at').innerText = `Started: ${jam} WIB`;
+            }
+            updateDurationDisplay();  // Update angka durasi
+
+            // 5. Items breakdown list
+            renderItemsBreakdown(order.items);
+
+            // 6. Status (warna + teks + tombol enable/disable)
+            renderDetailOrderStatus();
+
+            // 7. Rute hasil pathfinding (kalau sudah ada)
+            const pathEl = document.getElementById('detail-path-sequence');
+            const routeInfo = document.getElementById('detail-route-info');
+            if (pathEl) {
+                if (order.route && order.route.node_sequence) {
+                    // Titik akhir tergantung tipe order:
+                    //   Picking  -> berakhir di Stage (ambil dari rak, antar ke Stage)
+                    //   Put-Away -> kembali ke Base (simpan ke rak, balik ke Base)
+                    const titikAkhir = (order.orderType === 'Picking') ? 'Stage' : 'Base';
+                    const urutan = ['Base']
+                        .concat(
+                            order.route.node_sequence.map(
+                                node => String(node).split('-')[0]
+                            )
+                        )
+                        .concat([titikAkhir]);
+
+                    // Render nodes sequentially: stay green (active-node) if already visited
+                    const highestIdx = order.highestVisitedIndex !== undefined ? order.highestVisitedIndex : 0;
+                    pathEl.innerHTML = urutan.map((node, index) => {
+                        const isVisited = (index <= highestIdx);
+                        if (isVisited) {
+                            return `<span class="active-node">${node}</span>`;
+                        } else {
+                            return `<span>${node}</span>`;
+                        }
+                    }).join(' → ');
+
+                    // Geometri posisi node untuk pencarian koordinat
+                    const N_geom = {
+                        "A1": [4, -8.5], "A2": [4, -7], "A3": [4, -4.5], "A4": [4, -3],
+                        "B1": [1.5, -8.5], "B2": [1.5, -7], "B3": [1.5, -4.5], "B4": [1.5, -3],
+                        "C1": [-1, -8.5], "C2": [-1, -7], "C3": [-1, -4.5], "C4": [-1, -3],
+                        "X1_A": [4, -5.7], "X1_B": [1.5, -5.7], "X1_C": [-1, -5.7],
+                        "X2_A": [3.5, -1.5], "X2_B": [1.5, -1.5],
+                        "X3_B": [1.5, 0], "X3_C": [-1, 0],
+                        "XA_T-junc": [4, -1.5],
+                        "Stage": [3.5, 0.5], "Base": [0, 0]
+                    };
+
+                    // Hitung estimasi waktu berdasarkan aturan simulasi sekuensial (5s hanya saat target pertama kali dikunjungi)
+                    let simTravelS = 0;
+                    let simPickPutS = 0;
+
+                    if (order.route.path_xy) {
+                        const targets = [];
+                        if (order.route.node_sequence) {
+                            order.route.node_sequence.forEach(node => {
+                                targets.push(String(node).split('-')[0]);
+                            });
+                        }
+
+                        const pathNodes = [];
+                        order.route.path_xy.forEach(coord => {
+                            let matchedNode = null;
+                            for (const [nodeName, nodeCoord] of Object.entries(N_geom)) {
+                                if (Math.abs(coord[0] - nodeCoord[0]) < 0.1 && Math.abs(coord[1] - nodeCoord[1]) < 0.1) {
+                                    matchedNode = nodeName;
+                                    break;
+                                }
+                            }
+                            pathNodes.push(matchedNode);
+                        });
+
+                        const stopIndices = new Set();
+                        let searchStartIdx = 0;
+                        targets.forEach(target => {
+                            let foundIdx = pathNodes.indexOf(target, searchStartIdx);
+                            if (foundIdx !== -1) {
+                                stopIndices.add(foundIdx);
+                                searchStartIdx = foundIdx + 1;
+                            }
+                        });
+
+                        order.route.path_xy.forEach((coord, index) => {
+                            if (stopIndices.has(index)) {
+                                const node = pathNodes[index];
+                                const qty = (order.route.qty_per_node && order.route.qty_per_node[node]) || 1;
+                                simPickPutS += qty * 2;   // 2 detik per item
+                            } else {
+                                simTravelS += 2;
+                            }
+                        });
+                    }
+                    let simTotalS = simTravelS + simPickPutS;
+
+                    const actionLabel = (order.orderType === 'Picking') ? 'pick' : 'put';
+                    if (routeInfo) routeInfo.innerText =
+                        "Estimated Duration: " + simTotalS + " s (moving "
+                        + simTravelS + "s + " + actionLabel + " " + simPickPutS + "s)";
+                } else {
+                    pathEl.innerText = "Menunggu rute dari pathfinding…";
+                    if (routeInfo) routeInfo.innerText = "";
+                }
+            }
+
+            // 8. Gambar denah gudang + rute di area map
+            gambarPeta(order);
+        }
+
+        /**
+         * Render daftar item yang di-order sebagai card list di breakdown.
+         */
+        function renderItemsBreakdown(items) {
+            const container = document.getElementById('detail-items-list');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="items-empty">No items in this order</div>';
+                return;
+            }
+            container.innerHTML = items.map(item => `
+                <div class="item-row">
+                    <div class="item-info">
+                        <span class="item-name">${item.nama || 'Unknown Item'}</span>
+                        <span class="item-meta">Rack ${item.rak} • Code: ${item.kode || '—'}</span>
+                    </div>
+                    <span class="item-qty">${item.jumlah} pcs</span>
+                </div>
+            `).join('');
+        }
+        // ============ VISUAL MAP (denah gudang + rute) ============
+        // Geometri mengikuti ca_star_select.py (satuan meter). Sumbu Y dibalik untuk SVG.
+        const PETA = {
+            W: 7, H: 11, scale: 60, pad: 16,
+            racks: {
+                "A1": [4, -8.5], "A2": [4, -7], "A3": [4, -4.5], "A4": [4, -3],
+                "B1": [1.5, -8.5], "B2": [1.5, -7], "B3": [1.5, -4.5], "B4": [1.5, -3],
+                "C1": [-1, -8.5], "C2": [-1, -7], "C3": [-1, -4.5], "C4": [-1, -3]
+            },
+            crossing: [[4, -5.7], [1.5, -5.7], [-1, -5.7], [3.5, -1.5], [1.5, -1.5], [1.5, 0], [-1, 0], [4, -1.5]],
+            stage: [3.5, 0.5],
+            base: [0, 0],
+            // [x, y, lebar, tinggi] dalam meter — dari grid_converter.py (translated by subtracting from boundary)
+            meja: [
+                [2.41, -9.5, 1.18, 1.6], [-0.59, -9.5, 1.18, 1.6],
+                [2.41, -7.9, 1.18, 1.6], [-0.59, -7.9, 1.18, 1.6],
+                [2.41, -5.3, 1.18, 1.6], [-0.59, -5.3, 1.18, 1.6],
+                [1.82, -3.7, 1.18, 1.6], [-0.59, -3.7, 1.18, 1.6]
+            ],
+            ungu: [[2.25, -1.5, 0.75, 2.0]]
+        };
+        function petaX(mx) { return PETA.pad + (mx + 2) * PETA.scale; }
+        function petaY(my) { return PETA.pad + (PETA.H - (my + 9.5)) * PETA.scale; }  // flip Y
+        function rakDariLabel(lbl) { return String(lbl).split('-')[0]; }      // "A1-1" -> "A1"
+
+        // mode peta: 'rute' (pathfinding) atau 'lidar' (peta LIDAR AMR)
+        let modePeta = 'rute';
+
+        // koordinat node (dipakai untuk gambar peta rute)
+        const NODE_GEOM = {
+            "A1": [4, -8.5], "A2": [4, -7], "A3": [4, -4.5], "A4": [4, -3],
+            "B1": [1.5, -8.5], "B2": [1.5, -7], "B3": [1.5, -4.5], "B4": [1.5, -3],
+            "C1": [-1, -8.5], "C2": [-1, -7], "C3": [-1, -4.5], "C4": [-1, -3],
+            "X1_A": [4, -5.7], "X1_B": [1.5, -5.7], "X1_C": [-1, -5.7],
+            "X2_A": [3.5, -1.5], "X2_B": [1.5, -1.5],
+            "X3_B": [1.5, 0], "X3_C": [-1, 0],
+            "XA_T-junc": [4, -1.5],
+            "Stage": [3.5, 0.5], "Base": [0, 0]
+        };
+
+        
+        function tombolTogglePeta() {
+            const label = (modePeta === 'rute') ? 'See AMR MAP' : 'See CA* Route';
+            return `<button onclick="modePeta=(modePeta==='rute'?'lidar':'rute');gambarPeta(daftarPesanan.find(o=>o.id===currentOrderId));"
+                     style="position:absolute; top:8px; right:12px; z-index:5; font-size:11px; padding:4px 9px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; font-family:Inter,sans-serif;">${label}</button>`;
+        }
+
+        function gambarPeta(order) {
+            const cont = document.getElementById('canvas-container');
+            if (!cont) return;
+            if (modePeta === 'lidar') { gambarLidar(cont); return; }
+            gambarRute(cont, order);
+        }
+
+        // ---- PETA LIDAR (peta asli AMR) ----
+        function gambarLidar(cont) {
+            const now = new Date();
+            cont.innerHTML = `
+                <div style="position:relative; width:100%; max-width:400px; height:400px; margin:0 auto;">
+                  <img id="lidar-map" src="http://192.168.0.100:5000/map_snapshot.png?t=${now.getTime()}"
+                       style="width:100%; height:100%; object-fit:contain; border-radius:15px; background-color:#eee; display:block;">
+                  <div id="map-ts" style="position:absolute; bottom:8px; right:12px; font-size:10px; color:#666; background:rgba(255,255,255,0.75); padding:2px 6px; border-radius:4px; font-family:Inter,sans-serif;">LIDAR - ${now.toLocaleTimeString()}</div>
+                  ${tombolTogglePeta()}
+                </div>`;
+        }
+
+        // ---- PETA RUTE PATHFINDING (garis biru + checkpoint) ----
+        // ---- PETA RUTE PATHFINDING (garis biru + checkpoint) ----
+// ---- PETA RUTE PATHFINDING (Desain Asli dari Kodingan Lama) ----
+function gambarRute(cont, order) {
+    // Transformasi Map: Menyesuaikan koordinat Python baru ke Map Lama
+    // Rumus balikan matriks: x_lama = 5 - x_baru | y_lama = 1.5 - y_baru
+    const toOldX = (x_baru) => 5 - x_baru;
+    const toOldY = (y_baru) => 1.5 - y_baru;
+
+    // transform meter -> piksel (ruangan 7x11 m)
+    const W = 7, H = 11, scale = 60, pad = 16;
+    const Wpx = pad * 2 + W * scale, Hpx = pad * 2 + H * scale;
+    const px = x => pad + x * scale;
+    const py = y => pad + (H - y) * scale;      // flip sumbu Y
+
+    // posisi node (dari node_map lama)
+    const N = {
+        "A1":[1,10], "A2":[1,8.5], "A3":[1,6], "A4":[1,4.5],
+        "B1":[3.5,10], "B2":[3.5,8.5], "B3":[3.5,6], "B4":[3.5,4.5],
+        "C1":[6,10], "C2":[6,8.5], "C3":[6,6], "C4":[6,4.5],
+        "X1_A":[1,7.2], "X1_B":[3.5,7.2], "X1_C":[6,7.2],
+        "X2_A":[1.5,3], "X2_B":[3.5,3],
+        "X3_B":[3.5,1.5], "X3_C":[6,1.5],
+        "XA_T-junc":[1,3],
+        "Stage":[1.5,1], "Base":[5,1.5]
+    };
+
+    // track / pathway agent (garis abu putus-putus)
+    const TRACK = [
+        ["A1","A2"],["A2","X1_A"],["X1_A","A3"],["A3","A4"],["A4","XA_T-junc"],["XA_T-junc","X2_A"],["X2_A","Stage"],
+        ["B1","B2"],["B2","X1_B"],["X1_B","B3"],["B3","B4"],["B4","X2_B"],["X2_B","X3_B"],
+        ["C1","C2"],["C2","X1_C"],["X1_C","C3"],["C3","C4"],["C4","X3_C"],
+        ["X1_A","X1_B"],["X1_B","X1_C"],
+        ["X2_A","X2_B"],
+        ["X3_B","Base"],["Base","X3_C"]
+    ];
+
+    // meja & obstacle ungu : [x, y, lebar, tinggi]
+    const MEJA = [
+        [1.7, 9.4, 1.18, 1.6], [4.2, 9.4, 1.18, 1.6],
+        [1.7, 7.8, 1.18, 1.6], [4.2, 7.8, 1.18, 1.6],
+        [1.7, 5.2, 1.18, 1.6], [4.2, 5.2, 1.18, 1.6],
+        [1.7, 3.6, 1.18, 1.6], [4.2, 3.6, 1.18, 1.6],
+        [4.2, 2.5, 1.18, 1.1],
+    ];
+    const UNGU = [2.3, 0, 0.75, 2.0];
+    const RAK = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4"];
+
+let rakRute = [];
+    let nextTargetNode = null;
+    let visitedNodes = [];
+
+    // Mengkalkulasi urutan rak untuk pewarnaan dan highlight
+    if (order && order.route && order.route.node_sequence) {
+        rakRute = order.route.node_sequence.map(l => String(l).split('-')[0]);
+        
+        const titikAkhir = (order.orderType === 'Picking') ? 'Stage' : 'Base';
+        const urutan = ['Base'].concat(rakRute).concat([titikAkhir]);
+        const hi = (order.highestVisitedIndex !== undefined) ? order.highestVisitedIndex : 0;
+
+        visitedNodes = urutan.slice(0, hi + 1); // Node yang sudah dilewati
+        if (hi + 1 < urutan.length) {
+            nextTargetNode = urutan[hi + 1]; // Node target selanjutnya (yang di-highlight)
+        }
+    }
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wpx} ${Hpx}" style="width:100%;height:auto;background:#fff;border-radius:12px;">`;
+    svg += `<rect x="${pad}" y="${pad}" width="${W * scale}" height="${H * scale}" fill="#fbf7f2" stroke="#8a6a45" stroke-width="2" rx="6"/>`;
+    
+    // gambar meja oranye
+    MEJA.forEach(([x, y, w, h]) => {
+        svg += `<rect x="${px(x)}" y="${py(y + h)}" width="${w * scale}" height="${h * scale}" fill="#f6a623" stroke="#c77d11" stroke-width="1.5" rx="2"/>`;
+    });
+    
+    // gambar obstacle ungu
+    svg += `<rect x="${px(UNGU[0])}" y="${py(UNGU[1] + UNGU[3])}" width="${UNGU[2] * scale}" height="${UNGU[3] * scale}" fill="#7e3ff2" stroke="#4b1fa3" stroke-width="1.5" rx="2"/>`;
+    
+    // gambar track virtual
+    TRACK.forEach(([u, v]) => {
+        svg += `<line x1="${px(N[u][0])}" y1="${py(N[u][1])}" x2="${px(N[v][0])}" y2="${py(N[v][1])}" stroke="#b5b5b5" stroke-width="2" stroke-dasharray="5 4"/>`;
+    });
+    
+    // gambar rute pathfinding (biru tebal)
+    if (order && order.route && order.route.path_xy && order.route.path_xy.length > 1) {
+        const poly = order.route.path_xy.map(([nx, ny]) => {
+            const ox = toOldX(nx);
+            const oy = toOldY(ny);
+            return `${px(ox)},${py(oy)}`;
+        }).join(' ');
+        svg += `<polyline points="${poly}" fill="none" stroke="#1565c0" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>`;
+    }
+    
+    // crossing node
+    ["X1_A", "X1_B", "X1_C", "X2_A", "X2_B", "X3_B", "X3_C"].forEach(k => {
+        svg += `<circle cx="${px(N[k][0])}" cy="${py(N[k][1])}" r="4" fill="#c9c9c9"/>`;
+    });
+    
+    // rack node (Pewarnaan Dinamis + Efek Glowing)
+    RAK.forEach(lab => {
+        const [x, y] = N[lab]; 
+        const diRute = rakRute.includes(lab);
+        const sudahLewat = visitedNodes.includes(lab);
+        const isNextTarget = (lab === nextTargetNode);
+
+        let warnaFill = '#1f77b4'; // Biru bawaan
+        if (sudahLewat) warnaFill = '#1b5e20'; // Hijau gelap (sudah dilalui)
+        else if (diRute) warnaFill = '#4caf50'; // Hijau terang (masuk rute)
+
+        svg += `<circle cx="${px(x)}" cy="${py(y)}" r="9" fill="${warnaFill}"/>`;
+
+        // Animasi Glowing Oranye jika ini adalah target tujuan Agent saat ini
+        if (isNextTarget) {
+            svg += `<circle cx="${px(x)}" cy="${py(y)}" r="14" fill="none" stroke="#ff9500" stroke-width="3" filter="drop-shadow(0px 0px 5px #ff9500)">
+                        <animate attributeName="r" values="10;15;10" dur="1s" repeatCount="indefinite" />
+                    </circle>`;
+        }
+
+        svg += `<text x="${px(x)}" y="${py(y) - 12}" font-size="10" fill="#333" text-anchor="middle" font-weight="bold" font-family="Inter,sans-serif">${lab}</text>`;
+    });
+    
+    // base & stage (Pewarnaan Dinamis + Efek Glowing)
+    ["Base", "Stage"].forEach(lab => {
+        const [x, y] = N[lab];
+        const sudahLewat = visitedNodes.includes(lab);
+        const isNextTarget = (lab === nextTargetNode);
+
+        let warnaFill = '#d62728'; // Merah bawaan
+        if (sudahLewat) warnaFill = '#1b5e20'; // Berubah hijau saat sudah dilalui
+
+        svg += `<circle cx="${px(x)}" cy="${py(y)}" r="9" fill="${warnaFill}"/>`;
+
+        if (isNextTarget) {
+            svg += `<circle cx="${px(x)}" cy="${py(y)}" r="14" fill="none" stroke="#ff9500" stroke-width="3" filter="drop-shadow(0px 0px 5px #ff9500)">
+                        <animate attributeName="r" values="10;15;10" dur="1s" repeatCount="indefinite" />
+                    </circle>`;
+        }
+
+        svg += `<text x="${px(x)}" y="${py(y) - 12}" font-size="11" fill="${warnaFill}" text-anchor="middle" font-weight="bold" font-family="Inter,sans-serif">${lab}</text>`;
+    });
+    // Menggambar indikator Agent/AMR jika sedang berjalan
+    if (window.currentAGVCoord) {
+        const ax = toOldX(window.currentAGVCoord[0]);
+        const ay = toOldY(window.currentAGVCoord[1]);
+        svg += `
+            <circle cx="${px(ax)}" cy="${py(ay)}" r="14" fill="#f59e0b" opacity="0.4">
+                <animate attributeName="r" values="12;16;12" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="${px(ax)}" cy="${py(ay)}" r="8" fill="#d97706" stroke="#fff" stroke-width="1.5"/>
+        `;
+    } else if (window.currentAGVNode && N[window.currentAGVNode]) {
+        const [ax, ay] = N[window.currentAGVNode];
+        svg += `
+            <circle cx="${px(ax)}" cy="${py(ay)}" r="14" fill="#f59e0b" opacity="0.4">
+                <animate attributeName="r" values="12;16;12" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="${px(ax)}" cy="${py(ay)}" r="8" fill="#d97706" stroke="#fff" stroke-width="1.5"/>
+        `;
+    }
+
+    svg += `</svg>`;
+    cont.innerHTML = `
+        <div style="position:relative; width:100%; max-width:400px; margin:0 auto;">
+          ${svg}
+          ${typeof tombolTogglePeta === 'function' ? tombolTogglePeta() : ''}
+        </div>`;
+}
+
+        function updateLidarMap() {
+            if (modePeta !== 'lidar') return;   // hanya refresh saat mode LIDAR
+            const img = document.getElementById('lidar-map');
+            if (img) img.src = 'http://192.168.0.100:5000/map_snapshot.png?t=' + Date.now();
+            const ts = document.getElementById('map-ts');
+            if (ts) ts.textContent = 'LIDAR - ' + new Date().toLocaleTimeString();
+        }
+        setInterval(updateLidarMap, 2000);
+        /**
+         * Update angka durasi (HH : MM : SS) berdasarkan order.createdAt.
+         * Dipanggil setiap detik oleh setInterval, atau saat render detail.
+         */
+        function updateDurationDisplay() {
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (!order || !order.createdAt) return;
+
+            const durasiEl = document.getElementById('detail-duration');
+            if (!durasiEl) return;
+
+            // Jika order sudah selesai (Completed/Aborted), pakai endedAt untuk freeze durasi
+            const endTime = order.endedAt || Date.now();
+            const elapsed = Math.floor((endTime - order.createdAt) / 1000);  // dalam detik
+            const jam = Math.floor(elapsed / 3600).toString().padStart(2, '0');
+            const menit = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+            const detik = (elapsed % 60).toString().padStart(2, '0');
+            durasiEl.innerText = `${jam} : ${menit} : ${detik}`;
+        }
+
+        // Timer global yang update durasi setiap detik (hanya saat di halaman detail)
+        setInterval(() => {
+            const halamanDetail = document.getElementById('page-order-detail');
+            if (halamanDetail && halamanDetail.style.display !== 'none') {
+                updateDurationDisplay();
+            }
+        }, 1000);
+
+        /**
+         * Render tampilan status order di halaman detail (warna, teks, tombol)
+         * berdasarkan status di daftarPesanan
+         */
+        function renderDetailOrderStatus() {
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            const statusEl = document.getElementById('detail-order-status');
+            const descEl = document.getElementById('detail-order-status-desc');
+            const btnPause = document.getElementById('btn-pause-order');
+            const btnAbort = document.getElementById('btn-abort-order');
+            const btnForce = document.getElementById('btn-force-complete');
+            const btnSimulate = document.getElementById('btn-simulate-movement');
+
+            // Reset semua class status dulu
+            statusEl.classList.remove('ongoing', 'completed', 'paused', 'aborted');
+
+            switch (order.status) {
+                case 'On Going':
+                    statusEl.classList.add('ongoing');
+                    statusEl.innerText = 'On Going';
+                    descEl.innerText = 'Agent is working...';
+                    btnPause.innerText = 'Pause Order';
+                    btnPause.disabled = false;
+                    btnAbort.disabled = false;
+                    btnForce.disabled = false;
+                    break;
+
+                case 'Paused':
+                    statusEl.classList.add('paused');
+                    statusEl.innerText = 'Paused';
+                    descEl.innerText = 'Order is on hold';
+                    btnPause.innerText = 'Resume Order';
+                    btnPause.disabled = false;
+                    btnAbort.disabled = false;
+                    btnForce.disabled = true;
+                    break;
+
+                case 'Completed':
+                    statusEl.classList.add('completed');
+                    statusEl.innerText = 'Completed';
+                    descEl.innerText = 'Order finished successfully';
+                    btnPause.innerText = 'Pause Order';
+                    btnPause.disabled = true;
+                    btnAbort.disabled = true;
+                    btnForce.disabled = true;
+                    break;
+
+                case 'Aborted':
+                    statusEl.classList.add('aborted');
+                    statusEl.innerText = 'Aborted';
+                    descEl.innerText = 'Order was aborted by operator';
+                    btnPause.innerText = 'Pause Order';
+                    btnPause.disabled = true;
+                    btnAbort.disabled = true;
+                    btnForce.disabled = true;
+                    break;
+            }
+
+            // Disable Simulate button if not On Going, or if simulation is already running
+            if (btnSimulate) {
+                btnSimulate.disabled = (order.status !== 'On Going' || intervalSimulasiAGV !== null);
+            }
+        }
+
+        async function loadCabinetStock() {
+            try {
+                const response = await fetch('/kabinet');
+                if (!response.ok) throw new Error('Gagal mengambil data stok');
+                const kabinets = await response.json();
+                kabinets.forEach(kab => {
+                    const cardEl = document.getElementById(`card-${kab.kabinet_id}`);
+                    if (cardEl) {
+                        let stockEl = cardEl.querySelector('.card-stock');
+                        if (!stockEl) {
+                            stockEl = document.createElement('div');
+                            stockEl.className = 'card-stock';
+                            cardEl.insertBefore(stockEl, cardEl.querySelector('.qty-container'));
+                        }
+                        stockEl.textContent = `Stock: ${kab.quantity}`;
+                        cardEl.dataset.stock = kab.quantity;
+                    }
+                });
+            } catch (err) {
+                console.error('[Database] Gagal memuat stok kabinet:', err);
+            }
+        }
+
+        async function updateDatabaseStock(order) {
+            console.log(`[Database] Mengupdate stok untuk Order #${order.id} (${order.orderType}) ke database...`);
+            try {
+                const response = await fetch('/transaksi-bulk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        order_type: order.orderType,
+                        items: order.items.map(it => ({
+                            kabinet_id: it.rak,
+                            qty: it.jumlah
+                        }))
+                    })
+                });
+
+                const resData = await response.json();
+                if (response.ok) {
+                    console.log("✓ [Database] Berhasil update stok di database:", resData);
+                    showNotif(`Stok database berhasil diupdate untuk Order #${order.id}`, 'success');
+                    loadCabinetStock();
+                } else {
+                    console.error("✗ [Database] Gagal update stok database:", resData.error);
+                    showNotif(`Gagal update database: ${resData.error}`, 'error');
+                }
+            } catch (err) {
+                console.error("Error updating database stock:", err);
+                showNotif("Gagal menghubungi server database API", 'error');
+            }
+        }
+
+        /**
+         * Ubah status order di data + refresh tampilan detail & list
+         */
+        function ubahStatusOrder(idOrder, statusBaru) {
+            const order = daftarPesanan.find(o => o.id === idOrder);
+            if (!order) {
+                console.warn('Order tidak ditemukan:', idOrder);
+                return;
+            }
+            order.status = statusBaru;
+            order.updatedAt = Date.now();  // ⬅️ Selalu update timestamp saat status berubah
+
+            // Freeze durasi saat order mencapai terminal state
+            if (statusBaru === 'Completed' || statusBaru === 'Aborted') {
+                order.endedAt = Date.now();
+                // ⬅️ Trigger notifikasi untuk event Completed/Aborted
+                tambahNotifikasi(idOrder, statusBaru.toLowerCase());
+                updateDatabaseStock(order);
+            }
+            else {
+                // Resume dari Paused → On Going: hapus endedAt agar timer jalan lagi
+                delete order.endedAt;
+            }
+
+            saveState();
+            renderDetailOrderStatus();
+            updateTampilanOrderList();
+        }
+
+        // ---- HANDLER TOMBOL ABORT (dengan konfirmasi modal) ----
+        function konfirmasiAbortOrder() {
+            document.getElementById('modal-confirm-abort').style.display = 'flex';
+        }
+        function batalAbortOrder() {
+            document.getElementById('modal-confirm-abort').style.display = 'none';
+        }
+        function konfirmasiAbortOrderYa() {
+            document.getElementById('modal-confirm-abort').style.display = 'none';
+            ubahStatusOrder(currentOrderId, 'Aborted');
+        }
+
+        // ---- HANDLER TOMBOL PAUSE (toggle Pause <-> Resume) ----
+        function togglePauseOrder() {
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            if (order.status === 'On Going') {
+                ubahStatusOrder(currentOrderId, 'Paused');
+            } else if (order.status === 'Paused') {
+                ubahStatusOrder(currentOrderId, 'On Going');
+            }
+        }
+
+        // ---- HANDLER TOMBOL FORCE COMPLETE ----
+        function forceCompleteOrder() {
+            ubahStatusOrder(currentOrderId, 'Completed');
+        }
+
+        // ---- ORDER TYPE SELECTOR ----
+        function pilihOrderType(tipe) {
+            selectedOrderType = tipe;
+            // Update visual: tombol aktif punya class .active
+            document.querySelectorAll('.type-btn').forEach(btn => {
+                if (btn.dataset.type === tipe) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            saveState();
+        }
+
+        // ---- STATUS FILTER (pengganti search bar) ----
+        /**
+         * Set filter aktif dan re-render order list.
+         * Tidak mengubah daftarPesanan — hanya menyaring tampilan.
+         * @param {string} filter - 'All'|'On Going'|'Paused'|'Completed'|'Aborted'
+         */
+        function pilihFilter(filter) {
+            activeFilter = filter;
+            // Update visual active state tombol filter
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            // Re-render order list dengan filter baru
+            updateTampilanOrderList();
+        }
+
+        // ============ TOAST NOTIFICATION ============
+        /**
+         * Tampilkan toast notification kecil di pojok kanan atas.
+         * @param {string} pesan - Teks notifikasi
+         * @param {string} tipe  - 'success' | 'error' | 'info' (default: info)
+         * @param {number} durasi - lama tampil dalam ms (default: 3000)
+         */
+        function showNotif(pesan, tipe = 'info', durasi = 3000) {
+            const container = document.getElementById('toast-container');
+            if (!container) {
+                console.warn('[Notif] Toast container not found:', pesan);
+                return;
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${tipe}`;
+            toast.textContent = pesan;
+            container.appendChild(toast);
+
+            // Auto-remove setelah durasi - tambah fade-out animation dulu
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 300);
+            }, durasi);
+        }
+
+        // ============ NOTIFICATION BELL SYSTEM ============
+
+        /**
+         * Tambah notifikasi baru ke list (latest di atas).
+         * Otomatis save & re-render bell.
+         * @param {string} orderId - ID order yang trigger event
+         * @param {string} eventType - 'assigned' | 'completed' | 'aborted'
+         */
+        function tambahNotifikasi(orderId, eventType) {
+            const notif = {
+                id: notifIdCounter++,
+                orderId: orderId,
+                eventType: eventType,   // 'assigned' | 'completed' | 'aborted'
+                timestamp: Date.now(),
+                read: false
+            };
+            daftarNotifikasi.unshift(notif);  // Latest di depan array
+
+            // Batasi max 50 notifikasi (hapus yang paling lama)
+            if (daftarNotifikasi.length > 50) {
+                daftarNotifikasi = daftarNotifikasi.slice(0, 50);
+            }
+
+            saveState();
+            renderNotifikasi();
+        }
+
+        /**
+         * Render bell badge + dropdown panel content.
+         * Dipanggil setiap kali ada perubahan notifikasi.
+         */
+        function renderNotifikasi() {
+            const badge = document.getElementById('notif-badge');
+            const list = document.getElementById('notif-list');
+            const markAllBtn = document.getElementById('notif-mark-all');
+            if (!badge || !list) return;
+
+            // Hitung unread count
+            const unreadCount = daftarNotifikasi.filter(n => !n.read).length;
+
+            // Update badge
+            if (unreadCount > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Disable "Mark all as read" jika tidak ada unread
+            if (markAllBtn) {
+                markAllBtn.disabled = unreadCount === 0;
+            }
+
+            // Render list items
+            if (daftarNotifikasi.length === 0) {
+                list.innerHTML = `
+                    <div class="notif-empty">
+                        <div class="notif-empty-icon">🔕</div>
+                        <div>No notifications yet</div>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = daftarNotifikasi.map(notif => {
+                const iconConfig = {
+                    'assigned': { icon: '📋', label: 'Assigned' },
+                    'completed': { icon: '✓', label: 'Completed' },
+                    'aborted': { icon: '✕', label: 'Aborted' }
+                };
+                const config = iconConfig[notif.eventType] || iconConfig.assigned;
+                const unreadClass = notif.read ? '' : 'unread';
+
+                return `
+                    <div class="notif-item ${unreadClass}" onclick="klikNotifikasi(${notif.id})">
+                        <div class="notif-icon ${notif.eventType}">${config.icon}</div>
+                        <div class="notif-body">
+                            <div class="notif-title">Order #${notif.orderId} ${config.label}</div>
+                            <div class="notif-time">${formatWaktuRelatif(notif.timestamp)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Handler klik notification item: mark as read + navigate ke order detail.
+         */
+        function klikNotifikasi(notifId) {
+            const notif = daftarNotifikasi.find(n => n.id === notifId);
+            if (!notif) return;
+
+            // Mark as read
+            if (!notif.read) {
+                notif.read = true;
+                saveState();
+                renderNotifikasi();
+            }
+
+            // Tutup panel dropdown
+            tutupNotifPanel();
+
+            // Navigate ke order detail
+            lihatDetailOrder(notif.orderId);
+        }
+
+        /**
+         * Tandai semua notifikasi sebagai sudah dibaca.
+         */
+        function tandaiSemuaNotifDibaca() {
+            daftarNotifikasi.forEach(n => n.read = true);
+            saveState();
+            renderNotifikasi();
+        }
+
+        /**
+         * Toggle dropdown panel notification.
+         */
+        function toggleNotifPanel(event) {
+            if (event) event.stopPropagation();  // Cegah bubble ke document click
+            const panel = document.getElementById('notif-panel');
+            if (!panel) return;
+            const isOpen = panel.style.display !== 'none';
+            if (isOpen) {
+                tutupNotifPanel();
+            } else {
+                panel.style.display = 'flex';
+            }
+        }
+
+        function tutupNotifPanel() {
+            const panel = document.getElementById('notif-panel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        // Tutup panel saat klik di luar bell area
+        document.addEventListener('click', function (e) {
+            const wrapper = document.querySelector('.notif-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                tutupNotifPanel();
+            }
+        });
+
+        /**
+         * Format timestamp ke teks relatif: "Just now", "5 minutes ago", dll.
+         * @param {number} timestamp - Unix ms
+         */
+        function formatWaktuRelatif(timestamp) {
+            const elapsed = Date.now() - timestamp;
+            const detik = Math.floor(elapsed / 1000);
+            const menit = Math.floor(detik / 60);
+            const jam = Math.floor(menit / 60);
+            const hari = Math.floor(jam / 24);
+
+            if (detik < 30) return 'Just now';
+            if (menit < 1) return `${detik} seconds ago`;
+            if (menit === 1) return '1 minute ago';
+            if (menit < 60) return `${menit} minutes ago`;
+            if (jam === 1) return '1 hour ago';
+            if (jam < 24) return `${jam} hours ago`;
+            if (hari === 1) return 'Yesterday';
+            if (hari < 7) return `${hari} days ago`;
+            // Fallback: tanggal absolut
+            return new Date(timestamp).toLocaleDateString('en-GB');
+        }
+
+        /**
+         * Format timestamp ke format absolut Indonesia: "28/05/26 14.30"
+         * @param {number} timestamp - Unix ms
+         */
+        function formatWaktuAbsolut(timestamp) {
+            const d = new Date(timestamp);
+            const dd = d.getDate().toString().padStart(2, '0');
+            const mm = (d.getMonth() + 1).toString().padStart(2, '0');  // getMonth() 0-indexed
+            const yy = d.getFullYear().toString().slice(-2);            // 2 digit terakhir
+            const jam = d.getHours().toString().padStart(2, '0');
+            const menit = d.getMinutes().toString().padStart(2, '0');
+            return `${dd}/${mm}/${yy} ${jam}.${menit}`;
+        }
+
+        // Update timestamp relatif setiap 30 detik (kalau panel terbuka)
+        setInterval(() => {
+            const panel = document.getElementById('notif-panel');
+            if (panel && panel.style.display !== 'none') {
+                renderNotifikasi();
+            }
+        }, 30000);
+
+        // Update waktu relatif di order list setiap 30 detik (kalau halaman order-list terbuka)
+        setInterval(() => {
+            const halamanList = document.getElementById('page-order-list');
+            if (halamanList && halamanList.style.display !== 'none') {
+                updateTampilanOrderList();
+            }
+        }, 30000);
+
+        function ubahKuantitas(idKartu, idAngka, jumlah) {
+            const input = document.getElementById(idAngka);
+            const card = document.getElementById(idKartu);
+            let val = parseInt(input.value || 0) + jumlah;
+            if (val < 0) val = 0;
+
+            // Validasi stok jika tipe order adalah Picking
+            if (selectedOrderType === 'Picking' && jumlah > 0) {
+                const stock = parseInt(card.dataset.stock || 0);
+                if (val > stock) {
+                    alert(`Stok tidak mencukupi! Stok saat ini untuk kabinet ini hanya ${stock}.`);
+                    return;
+                }
+            }
+
+            input.value = val;
+            if (val > 0) card.classList.add('selected');
+            else card.classList.remove('selected');
+            saveState();
+        }
+
+        function inputKuantitas(idKartu, idInput) {
+            const input = document.getElementById(idInput);
+            const card = document.getElementById(idKartu);
+            let val = parseInt(input.value);
+            if (isNaN(val) || val < 0) val = 0;
+
+            // Validasi stok jika tipe order adalah Picking
+            if (selectedOrderType === 'Picking') {
+                const stock = parseInt(card.dataset.stock || 0);
+                if (val > stock) {
+                    alert(`Stok tidak mencukupi! Stok saat ini untuk kabinet ini hanya ${stock}.`);
+                    val = stock; // Batasi ke stok maksimal
+                }
+            }
+
+            input.value = val;
+            if (val > 0) card.classList.add('selected');
+            else card.classList.remove('selected');
+            saveState();
+        }
+        let sendTime = 0;
+        const downlinkPerRak = {};   // simpan downlink (ms) per rak dari ACK_Downlink
+        function kirimOrder() {
+            console.log("=== kirimOrder() dipanggil ===");
+            console.log("selectedOrderType:", selectedOrderType);
+            console.log("orderCounter:", orderCounter);
+            console.log("MQTT connected?", client && client.isConnected ? client.isConnected() : "client undefined");
+
+            let adaOrder = false;
+            let adaStockError = false;
+            let idFormatted = orderCounter.toString().padStart(2, '0');
+            let itemTerpilih = [];
+
+            const semuaAngka = document.querySelectorAll('.qty-value');
+            console.log("Jumlah qty element:", semuaAngka.length);
+
+            // Pass 1: Validasi Semua Item terhadap Stok
+            semuaAngka.forEach(function (elemen) {
+                let qty = parseInt(elemen.value || 0);
+                if (qty > 0) {
+                    let namaRak = elemen.id.replace('qty-', '');
+                    let elemenKartu = document.getElementById('card-' + namaRak);
+                    if (elemenKartu && selectedOrderType === 'Picking') {
+                        const stock = parseInt(elemenKartu.dataset.stock || 0);
+                        if (qty > stock) {
+                            alert(`Stok untuk kabinet ${namaRak} tidak mencukupi! Stok saat ini hanya ${stock}.`);
+                            elemen.value = stock; // Reset input ke stok maksimal
+                            // Toggle class selected jika stok maksimal ternyata 0
+                            if (stock === 0) {
+                                elemenKartu.classList.remove('selected');
+                            }
+                            adaStockError = true;
+                        }
+                    }
+                }
+            });
+
+            // Batalkan pengiriman jika ada stok yang tidak mencukupi
+            if (adaStockError) {
+                console.warn("⚠ Pengiriman order dibatalkan karena kuantitas melebihi stok database.");
+                return;
+            }
+
+            // Pass 2: Proses order dan kirim MQTT
+            semuaAngka.forEach(function (elemen) {
+                let qty = parseInt(elemen.value || 0);
+                if (qty > 0) {
+                    adaOrder = true;
+                    console.log("Item terpilih:", elemen.id, "qty:", qty);
+
+                    try {
+                        let namaRak = elemen.id.replace('qty-', '');
+
+                        let elemenKartu = document.getElementById('card-' + namaRak);
+                        if (!elemenKartu) {
+                            console.error("Card tidak ditemukan:", 'card-' + namaRak);
+                            return;  // skip item ini, lanjut ke item berikutnya
+                        }
+
+                        let namaBarang = elemenKartu.querySelector('.card-title').innerText;
+                        let teksIdRak = elemenKartu.querySelector('.card-id').innerText;
+
+                        // Defensif: handle kalau format card-id tidak punya tanda kurung
+                        let kodeBarang = "UNKNOWN";
+                        if (teksIdRak.includes('(')) {
+                            kodeBarang = teksIdRak.split('(')[1].replace(')', '').trim();
+                        }
+
+                        // Simpan info lengkap setiap item — untuk dipakai di order detail
+                        itemTerpilih.push({
+                            rak: namaRak,
+                            jumlah: qty,
+                            nama: namaBarang,
+                            kode: kodeBarang
+                        });
+
+                        // Try MQTT publish — kalau gagal, order TETAP tersimpan
+                        try {
+                            if (client && client.isConnected && client.isConnected()) {
+                                let dataKeESP = {
+                                    "order_type": selectedOrderType,
+                                    "item_name": namaBarang,
+                                    "item_code": kodeBarang,
+                                    "req_qty": qty
+                                };
+                                let topicTarget = "TA_PTL_bee/Rak_" + namaRak + "/perintah";
+                                let pesanString = JSON.stringify(dataKeESP);
+                                let message = new Paho.MQTT.Message(pesanString);
+                                message.destinationName = topicTarget;
+                                sendTime = Date.now();
+                                client.send(message);
+                                console.log("✓ MQTT sent to " + topicTarget + " -> " + pesanString);
+                            } else {
+                                console.warn("⚠ MQTT not connected, skipping publish. Order tetap tersimpan locally.");
+                            }
+                        } catch (mqttError) {
+                            console.error("MQTT publish failed (order tetap tersimpan):", mqttError);
+                        }
+
+                    } catch (error) {
+                        console.error("Error processing item " + elemen.id + ":", error);
+                    }
+                }
+            });
+
+            console.log("adaOrder:", adaOrder, "| itemTerpilih:", itemTerpilih);
+
+            if (adaOrder && itemTerpilih.length > 0) {
+                const now = Date.now();
+                let orderBaru = {
+                    id: idFormatted,
+                    items: itemTerpilih,
+                    status: "On Going",
+                    agent: "AGV-01",
+                    orderType: selectedOrderType,
+                    createdAt: now,
+                    updatedAt: now    // Awalnya sama dengan createdAt
+                };
+                daftarPesanan.push(orderBaru);
+                // === KIRIM ORDER UTUH untuk PATHFINDING (CA*) ===
+                orderBaru.highestVisitedIndex = 0;
+                const urutanAwal = ['Base']
+                    .concat(orderBaru.items.map(it => String(it.rak).split('-')[0]));
+                orderBaru.navText = "Menuju " + (urutanAwal[1] || 'Base');
+                window.currentAGVNode = "Base";   // mulai dari Base, bukan sisa order lama
+                window.currentAGVCoord = null;
+                try {
+                    if (client && client.isConnected && client.isConnected()) {
+                        let orderUntukAlgoritma = {
+                            order_id: idFormatted,
+                            order_type: selectedOrderType,
+                            items: itemTerpilih.map(function (it) {
+                                return { rak: it.rak, qty: it.jumlah, kode: it.kode, nama: it.nama };
+                            })
+                        };
+                        let msgOrder = new Paho.MQTT.Message(JSON.stringify(orderUntukAlgoritma));
+                        msgOrder.destinationName = "TA_PTL_bee/Order/baru";
+                        client.send(msgOrder);
+                        console.log("✓ Order utuh dikirim ke TA_PTL_bee/Order/baru -> " + msgOrder.payloadString);
+                    } else {
+                        console.warn("⚠ MQTT belum connect, order utuh tidak terkirim (order tetap tersimpan lokal).");
+                    }
+                } catch (e) {
+                    console.error("Gagal kirim order utuh ke pathfinding:", e);
+                }
+                orderCounter++;
+
+                saveState();
+                updateTampilanOrderList();
+                tambahNotifikasi(idFormatted, 'assigned');  // ⬅️ Trigger notif Assigned
+                console.log("✓ Order #" + idFormatted + " berhasil disimpan. Total orders:", daftarPesanan.length);
+                console.log(`Order #${idFormatted} Assigned`);   // non-blocking: jangan pakai alert (membekukan dashboard & merusak ukur latensi)
+                bukaHalaman('order-list');
+                resetSemuaKartu();
+            } else {
+                console.warn("Tidak ada item dipilih atau semua item gagal di-process");
+                alert("Select items first");
+            }
+        }
+
+        function onMessageArrived(message) {
+            // [1] Tangkap Rute dari Pathfinding (CA*)
+            if (message.destinationName.startsWith("TA_PTL_bee/Order/") &&
+                message.destinationName.endsWith("/route")) {
+                try {
+                    let rute = JSON.parse(message.payloadString);
+                    let order = daftarPesanan.find(o => o.id === rute.order_id);
+                    if (order) {
+                        order.route = rute;
+                        // peta dashboard menggunakan koordinat baru secara langsung
+                        // tidak perlu di-map/di-invert lagi ke koordinat lama
+                        order.highestVisitedIndex = 0; // Reset progress for the new route
+                        saveState();
+                        // mulai job AMR: robot ke rak pertama, tunggu lapor tiap rak
+                        amrMulaiJob(order.id, order.route.node_sequence,
+                            order.orderType, tampilkanStatusAMR);
+                        if (currentOrderId === rute.order_id) renderOrderDetail();
+                        console.log("✓ Rute diterima Order #" + rute.order_id + ": " + rute.route_display);
+                    } else {
+                        // Hanya tampilkan warning jika pesan tersebut bukan pesan lama yang tertahan (retained) di broker
+                        if (!message.retained) {
+                            console.warn("Rute untuk order tak ditemukan:", rute.order_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Gagal parse rute:", e);
+                }
+                return;
+            }
+
+            // [2] Tangkap ACK Downlink
+            if (message.destinationName === "TA_PTL_bee/ACK_Downlink") {
+                let receiveTime = Date.now();
+                let durasiDownlink = (receiveTime - sendTime) / 2;
+                try {
+                    let ackData = JSON.parse(message.payloadString);
+                    if (ackData.rak) downlinkPerRak[ackData.rak] = durasiDownlink;
+                } catch (e) { }
+                console.log("Downlink Dur. (HTML to ESP) : " + durasiDownlink + " ms");
+                return;
+            }
+
+            // [3] Tangkap Laporan Gateway
+            if (message.destinationName === "TA_PTL_bee/Gateway/lapor") {
+                let dataLapor = JSON.parse(message.payloadString);
+                console.log("====================================");
+                console.log("RACK: " + dataLapor.rack_id);
+                console.log("Operator_respond_time: " + dataLapor.d_tunggu + " s");
+                console.log("Proses pick/put: " + dataLapor.d_ambil + " s");
+                console.log("Total Dur: " + dataLapor.d_total + " s");
+                console.log("====================================");
+                // === UPDATE STOK DB untuk rak yang selesai ===
+                // === UPDATE STOK DB untuk rak yang selesai (dengan ukur sync delay) ===
+                if (dataLapor.rack_id && dataLapor.req_qty != null) {
+                    const syncStart = performance.now();          // stamp SEBELUM update
+                    fetch(`/kabinet/${dataLapor.rack_id}/adjust`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            qty: dataLapor.req_qty,
+                            order_type: dataLapor.order_type
+                        })
+                    })
+                        .then(r => r.json())
+                        .then(d => {
+                            const syncMs = Math.round(performance.now() - syncStart);   // durasi
+                            console.log("✓ DB updated " + dataLapor.rack_id + ":", d, "| sync " + syncMs + " ms");
+                            loadCabinetStock();   // refresh angka stok di dashboard
+                            // === SIMPAN LOG SYNC DELAY ke CSV ===
+                            fetch('/log-sync', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    order_id:   dataLapor.order_id || "",
+                                    rack_id:    dataLapor.rack_id,
+                                    order_type: dataLapor.order_type || "",
+                                    sync_ms:    syncMs
+                                })
+                            }).catch(e => console.error("✗ log-sync gagal:", e));
+                        })
+                        .catch(e => console.error("✗ DB update gagal:", e));
+                }
+                let msgBalesan = new Paho.MQTT.Message("Order_Finished");
+                // === update peta + checkpoint dari laporan PtL ===
+                laporNodeSelesai(dataLapor.rack_id);
+                // === lanjutkan AMR ke rak berikutnya ===
+                const nodeAMR = dataLapor.rack_id.split('-')[0];
+                const orderAMR = daftarPesanan.find(o =>
+                    o.status === 'On Going' && o.items.some(it => it.rak === dataLapor.rack_id));
+                if (orderAMR) amrOperatorSelesai(orderAMR.id, nodeAMR);
+              //  msgBalesan.destinationName = "TA_PTL_bee/ACK_Uplink";
+              //  client.send(msgBalesan);
+
+                // === SIMPAN LOG LATENSI ke CSV (1 baris per laporan rak) ===
+                const orderLog = daftarPesanan.find(o =>
+                    o.items && o.items.some(it => it.rak === dataLapor.rack_id));
+                fetch('/log-latensi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_id: orderLog ? orderLog.id : "",
+                        rack_id: dataLapor.rack_id,
+                        order_type: dataLapor.order_type,
+                        uplink_ms: (dataLapor.uplink_ms != null ? dataLapor.uplink_ms : ""),
+                        downlink_ms: (downlinkPerRak[dataLapor.rack_id] != null ? downlinkPerRak[dataLapor.rack_id] : "")
+                    })
+                }).catch(e => console.error("Gagal simpan log latensi:", e));
+
+                return;
+            }
+
+            // [4] Tangkap Current Node (Gabungan dari fungsi di bawah)
+            try {
+                const payload = JSON.parse(message.payloadString);
+                if (payload.event === "arrived" && payload.rak) {
+                    nodeArrived(payload.rak);
+                    
+                    // ==========================================
+                    // TAMBAHAN BARU: Kirim ACK_Uplink ke ESP32
+                    // ==========================================
+                    if (client && client.isConnected()) {
+                        let pesanAck = JSON.stringify({ rak: payload.rak });
+                        let msgAck = new Paho.MQTT.Message(pesanAck);
+                        msgAck.destinationName = "TA_PTL_bee/ACK_Uplink";
+                        client.send(msgAck);
+                        console.log("Mengirim ACK_Uplink ke ESP32 rak: " + payload.rak);
+                    }
+                    // ==========================================
+
+                    return;
+                }
+                if (payload.current_node) {
+                    updateCurrentNode(payload.current_node);
+                }
+            } catch (e) { /* bukan JSON, abaikan */ }
+            // Abaikan jika pesan bukan JSON format
+        }
+
+
+        function updateTampilanOrderList() {
+            const container = document.querySelector('.order-table-container');
+            container.innerHTML = "";
+
+            // Update button clear all
+            const btnClearAll = document.getElementById('btn-clear-all');
+            if (btnClearAll) {
+                btnClearAll.disabled = daftarPesanan.length === 0;
+            }
+
+            // Empty state jika belum ada order sama sekali
+            if (daftarPesanan.length === 0) {
+                container.innerHTML = `
+            <div class="empty-order-state">
+                <div class="empty-icon">📋</div>
+                <p class="empty-text">There is no order</p>
+                <p class="empty-subtext">Assign a new order to get started</p>
+            </div>
+        `;
+                return;
+            }
+
+            // Terapkan filter — 'All' tampilkan semua, selainnya filter by status
+            const filtered = activeFilter === 'All'
+                ? [...daftarPesanan]
+                : daftarPesanan.filter(o => o.status === activeFilter);
+
+            // Empty state jika filter tidak menghasilkan order
+            if (filtered.length === 0) {
+                const filterLabel = activeFilter;
+                container.innerHTML = `
+            <div class="empty-order-state">
+                <div class="empty-icon">🔍</div>
+                <p class="empty-text">No "${filterLabel}" orders</p>
+                <p class="empty-subtext">Try selecting a different filter</p>
+            </div>
+        `;
+                return;
+            }
+
+            // Render order yang ter-filter (latest dulu)
+            [...filtered].reverse().forEach(order => {
+                const statusClassMap = {
+                    'On Going': 'ongoing',
+                    'Paused': 'paused',
+                    'Completed': 'completed',
+                    'Aborted': 'aborted'
+                };
+                const statusClass = statusClassMap[order.status] || 'ongoing';
+                const totalQty = order.items.reduce((sum, item) => sum + item.jumlah, 0);
+                const orderType = order.orderType || 'Put-Away';
+
+                // Waktu update terakhir: pakai updatedAt, fallback ke createdAt untuk data lama
+                const waktuUpdate = order.updatedAt || order.createdAt;
+                let infoWaktu = '';
+                if (waktuUpdate) {
+                    const relatif = formatWaktuRelatif(waktuUpdate);
+                    const absolut = formatWaktuAbsolut(waktuUpdate);
+                    infoWaktu = ` · 🕐 ${relatif} (${absolut})`;
+                }
+
+                container.innerHTML += `
+            <div class="order-item-card" onclick="lihatDetailOrder('${order.id}')">
+                <div class="order-info">
+                    <span style="font-weight: 700; font-size: 18px;">Order #${order.id}</span>
+                    <span class="order-status-tag ${statusClass}">${order.status}</span>
+                </div>
+                <div style="color: #666; font-size: 14px;">
+                    ${orderType} | ${order.items.length} location(s) | ${totalQty} pcs total${infoWaktu}
+                </div>
+                <span style="color: #ccc;">▶</span>
+            </div>
+        `;
+            });
+        }
+
+        function resetSemuaKartu() {
+            const semuaAngka = document.querySelectorAll('.qty-value');
+            semuaAngka.forEach(el => el.value = "0");
+            const semuaKartu = document.querySelectorAll('.card');
+            semuaKartu.forEach(c => c.classList.remove('selected'));
+        }
+        let currentAGVNode = "Base";
+        window.currentAGVNode = "Base";
+        window.currentAGVCoord = null;
+        let intervalSimulasiAGV = null;
+
+        // Update peta + checkpoint dari laporan fisik PtL (satu rak selesai)
+        // Helper: bangun urutan lengkap [Base, rak..., titikAkhir] untuk sebuah order
+        function urutanNode(order) {
+            const titikAkhir = (order.orderType === 'Picking') ? 'Stage' : 'Base';
+            return ['Base']
+                .concat((order.route && order.route.node_sequence ? order.route.node_sequence : [])
+                    .map(n => String(n).split('-')[0]))
+                .concat([titikAkhir]);
+        }
+
+        // Cari order On Going yang memuat rak ini
+        function cariOrderDariRak(rackId) {
+            return daftarPesanan.find(o =>
+                o.status === 'On Going' &&
+                o.items && o.items.some(it => it.rak === rackId));
+        }
+
+        // Tampilkan teks status node + gambar ulang kalau order ini sedang dibuka
+        function setNavText(order, teks, agvNode) {
+            order.navText = teks;
+            window.currentAGVNode = agvNode;   // posisi marker di peta
+            window.currentAGVCoord = null;
+            const el = document.getElementById('current-node-value');
+            if (el) el.textContent = teks;
+            saveState();
+            if (order.id === currentOrderId) {
+                const hal = document.getElementById('page-order-detail');
+                if (hal && hal.style.display !== 'none') renderOrderDetail();
+            }
+        }
+
+        // EVENT 1: robot/operator SAMPAI di rak (dari 1st press -> event "arrived")
+        function nodeArrived(rackId) {
+            const node = String(rackId).split('-')[0];
+            const order = cariOrderDariRak(rackId);
+            if (!order) return;
+
+            const urutan = urutanNode(order);
+            if (order.highestVisitedIndex === undefined) order.highestVisitedIndex = 0;
+            const idx = urutan.indexOf(node, order.highestVisitedIndex);
+            if (idx !== -1) order.highestVisitedIndex = idx;
+
+            setNavText(order, node, node);     // "A1"  (sudah sampai)
+        }
+
+        // EVENT 2: task SELESAI di rak (dari lapor) -> menuju node berikutnya
+        function laporNodeSelesai(rackId) {
+            const node = String(rackId).split('-')[0];
+            const order = cariOrderDariRak(rackId);
+            if (!order) return;
+
+            const urutan = urutanNode(order);
+            const idxSekarang = urutan.indexOf(node);
+            const idxBerikut = idxSekarang + 1;
+
+            if (idxBerikut < urutan.length) {
+                const tujuan = urutan[idxBerikut];   // node berikutnya / Base / Stage
+                // tetap di node sekarang sampai sinyal "arrived" berikutnya;
+                // tapi tampilkan bahwa robot sedang menuju tujuan
+                setNavText(order, "Menuju " + tujuan, node);
+            }
+        }
+        function updateCurrentNode(nodeName) {
+            // Ignore crossing aisle nodes
+            if (nodeName && nodeName.startsWith('X')) {
+                return;
+            }
+            window.currentAGVNode = nodeName;
+            const currentNodeEl = document.getElementById("current-node-value");
+            if (currentNodeEl) {
+                currentNodeEl.textContent = nodeName;
+            }
+
+            // Update highest visited index for the current order
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (order && order.route && order.route.node_sequence) {
+                const titikAkhir = (order.orderType === 'Picking') ? 'Stage' : 'Base';
+                const urutan = ['Base']
+                    .concat(
+                        order.route.node_sequence.map(
+                            node => String(node).split('-')[0]
+                        )
+                    )
+                    .concat([titikAkhir]);
+
+                if (order.highestVisitedIndex === undefined) {
+                    order.highestVisitedIndex = 0;
+                }
+
+                // Look for nodeName starting from highestVisitedIndex
+                let nextIdx = urutan.indexOf(nodeName, order.highestVisitedIndex);
+                if (nextIdx !== -1) {
+                    order.highestVisitedIndex = nextIdx;
+                } else {
+                    // Fallback to searching from the start
+                    let fallbackIdx = urutan.indexOf(nodeName);
+                    if (fallbackIdx !== -1) {
+                        order.highestVisitedIndex = fallbackIdx;
+                    }
+                }
+                saveState();
+            }
+
+            // Re-render order detail if we are on the order detail page
+            const halamanDetail = document.getElementById('page-order-detail');
+            if (halamanDetail && halamanDetail.style.display !== 'none') {
+                renderOrderDetail();
+            }
+        }
+
+        function mulaiSimulasiAGV() {
+            const order = daftarPesanan.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            // Reset progress tracking when starting a simulation
+            order.highestVisitedIndex = 0;
+            saveState();
+
+            if (!order.route || !order.route.path_xy || order.route.path_xy.length === 0) {
+                alert("Rute pathfinding belum diterima! Pastikan python mqtt_pathfinding.py sudah berjalan.");
+                return;
+            }
+
+            if (order.status !== 'On Going') {
+                alert("Simulasi hanya dapat dijalankan untuk pesanan dengan status 'On Going'.");
+                return;
+            }
+
+            if (intervalSimulasiAGV) {
+                clearTimeout(intervalSimulasiAGV);
+                intervalSimulasiAGV = null;
+            }
+
+            console.log("=== Memulai Simulasi Pergerakan AGV ===");
+            showNotif(`Simulasi AGV berjalan untuk Order #${order.id}...`, 'info');
+
+            let pathIndex = 0;
+            const path = order.route.path_xy; // [[x, y], [x, y], ...]
+
+            const N = {
+                "A1": [4, -8.5], "A2": [4, -7], "A3": [4, -4.5], "A4": [4, -3],
+                "B1": [1.5, -8.5], "B2": [1.5, -7], "B3": [1.5, -4.5], "B4": [1.5, -3],
+                "C1": [-1, -8.5], "C2": [-1, -7], "C3": [-1, -4.5], "C4": [-1, -3],
+                "X1_A": [4, -5.7], "X1_B": [1.5, -5.7], "X1_C": [-1, -5.7],
+                "X2_A": [3.5, -1.5], "X2_B": [1.5, -1.5],
+                "X3_B": [1.5, 0], "X3_C": [-1, 0],
+                "XA_T-junc": [4, -1.5],
+                "Stage": [3.5, 0.5], "Base": [0, 0]
+            };
+
+            // Extract the rack targets in visit order (excluding start/end Base/Stage for 5s stops)
+            const targets = [];
+            if (order.route && order.route.node_sequence) {
+                order.route.node_sequence.forEach(node => {
+                    targets.push(String(node).split('-')[0]);
+                });
+            }
+
+            // Map each path coordinate to its node name
+            const pathNodes = [];
+            path.forEach(coord => {
+                let matchedNode = null;
+                for (const [nodeName, nodeCoord] of Object.entries(N)) {
+                    if (Math.abs(coord[0] - nodeCoord[0]) < 0.1 && Math.abs(coord[1] - nodeCoord[1]) < 0.1) {
+                        matchedNode = nodeName;
+                        break;
+                    }
+                }
+                pathNodes.push(matchedNode);
+            });
+
+            // Find the exact path indices where target pick/put actions occur (first visit sequentially)
+            const stopIndices = new Set();
+            let searchStartIdx = 0;
+            targets.forEach(target => {
+                let foundIdx = pathNodes.indexOf(target, searchStartIdx);
+                if (foundIdx !== -1) {
+                    stopIndices.add(foundIdx);
+                    searchStartIdx = foundIdx + 1;
+                }
+            });
+
+            function runStep() {
+                const activeOrder = daftarPesanan.find(o => o.id === currentOrderId);
+                if (!activeOrder || activeOrder.status !== 'On Going') {
+                    intervalSimulasiAGV = null;
+                    window.currentAGVCoord = null;
+                    renderOrderDetail();
+                    return;
+                }
+
+                if (pathIndex >= path.length) {
+                    intervalSimulasiAGV = null;
+                    window.currentAGVCoord = null;
+
+                    // Selesaikan pesanan otomatis di akhir rute
+                    ubahStatusOrder(currentOrderId, 'Completed');
+                    showNotif(`Simulasi selesai! Order #${currentOrderId} Completed`, 'success');
+                    return;
+                }
+
+                // Ambil koordinat dan update global variable
+                const coord = path[pathIndex];
+                window.currentAGVCoord = coord;
+
+                // Cari kecocokan koordinat dengan node
+                let matchedNode = null;
+                for (const [nodeName, nodeCoord] of Object.entries(N)) {
+                    if (Math.abs(coord[0] - nodeCoord[0]) < 0.1 && Math.abs(coord[1] - nodeCoord[1]) < 0.1) {
+                        matchedNode = nodeName;
+                        break;
+                    }
+                }
+
+                if (matchedNode) {
+                    updateCurrentNode(matchedNode);
+                }
+
+                // Gambar ulang peta
+                renderOrderDetail();
+
+                // 5 seconds at assigned pick/put nodes (first visit sequentially); 2 seconds for all other nodes
+                let delay = 2000;
+                if (stopIndices.has(pathIndex)) {
+                    delay = 5000;
+                }
+                pathIndex++;
+
+                intervalSimulasiAGV = setTimeout(runStep, delay);
+            }
+
+            intervalSimulasiAGV = setTimeout(runStep, 0);
+            renderOrderDetail();
+        }
+        // ============================================================
+        //  amr_control.js  —  PtL + AMR terkoordinasi
+        //  AMR jalan ke rak -> tunggu operator selesai (lapor) -> rak berikutnya
+        //  -> setelah rak terakhir, balik ke Home/Stage -> order selesai.
+        //  Tempel isi file ini ke dalam <script> dashboard.
+        // ============================================================
+
+        const AMR_URL = "/amr";   // lewat relay api.py (satu origin, tanpa CORS)
+        const AMR_AKTIF = true;   // turn on / off the robot
+
+        // CA* pakai "Base", robot partner pakai "Home" -> terjemahkan
+        function node2amr(n) {
+            const node = String(n).split('-')[0]; //eg = from B1-1 to B1 
+            return (node === "Base") ? "Home" : node;
+        }
+
+        async function amrStatus() {
+            const r = await fetch(`${AMR_URL}/status`);
+            return r.json();   // {nav_status, current_target, pose, speed_mmps}
+        }
+
+        // untuk waypoint: hanya Base->Home, node lain (termasuk crossing "XA_T-junc") apa adanya
+        function node2amrRaw(n) { return (String(n) === "Base") ? "Home" : String(n); }
+
+        // MODE B: kirim SATU segmen waypoint, robot jalan MULUS lewat semua node,
+        // berhenti hanya di node terakhir (rak / titik akhir).
+        // MODE A: kirim SATU node rak ke robot via /go_to_rack, tunggu sampai "arrived".
+        function amrPergiKe(node, tujuanLabel, onStatus) {
+            const say = onStatus || console.log;
+            return new Promise(async (resolve, reject) => {
+                const rakAMR = node2amrRaw(node);
+                let resp;
+                try {
+                    const r = await fetch(`${AMR_URL}/go_to_rack`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rack: rakAMR })
+                    });
+                    resp = await r.json();
+                } catch (e) { return reject(new Error("Robot tak terhubung")); }
+
+                if (resp.status === "error") return reject(new Error(resp.message || node));
+                say("Robot menuju " + tujuanLabel + "...");
+
+                const timer = setInterval(async () => {
+                    let s;
+                    try { s = await amrStatus(); }
+                    catch (e) { clearInterval(timer); return reject(new Error("Robot tak terhubung")); }
+                    if (s.nav_status === "arrived" || s.nav_status === "idle") {
+                        clearInterval(timer); say("Robot sampai di " + tujuanLabel); resolve(s);
+                    } else if (s.nav_status === "error") {
+                        clearInterval(timer); reject(new Error("Navigasi gagal menuju " + tujuanLabel));
+                    }
+                }, 1500);
+            });
+        }
+
+        // ============================================================
+        //  ORKESTRATOR (Mode A stepwise, RAK SAJA via /go_to_rack)
+        //  Tanpa crossing. Robot berhenti di tiap rak untuk operator (turn-taking).
+        // ============================================================
+        const amrJobs = {};   // order_id -> { antrean, idx, orderType, onStatus }
+        let amrSibuk = false;
+
+        // rackStops = node_sequence (rak saja, urut CA*). Crossing TIDAK dikirim.
+        async function amrMulaiJob(orderId, rackStops, orderType, onStatus) {
+            const say = onStatus || console.log;
+            if (!AMR_AKTIF) { say("AMR nonaktif (mode uji pathfinding)."); return; }
+            if (!rackStops || rackStops.length === 0) { say("node_sequence kosong."); return; }
+            if (amrJobs[orderId]) { return; }              // cegah start ganda (rute retained)
+            if (amrSibuk) { say("AMR sedang mengerjakan order lain. Order " + orderId + " menunggu."); return; }
+            amrSibuk = true;
+
+            const titikAkhir = (orderType === 'Picking') ? 'Stage' : 'Base';
+            const antrean = rackStops.map(n => ({ node: String(n).split('-')[0], isEnd: false }));
+            antrean.push({ node: titikAkhir, isEnd: true });   // titik akhir: langsung selesai
+
+            amrJobs[orderId] = { antrean, idx: 0, orderType, onStatus: say };
+            await amrKirimNode(orderId);
+        }
+
+        // Kirim node berikutnya. Rak -> tunggu lapor. Titik akhir -> order selesai.
+        async function amrKirimNode(orderId) {
+            const job = amrJobs[orderId];
+            if (!job) return;
+            const say = job.onStatus;
+
+            if (job.idx >= job.antrean.length) {
+                say("Order " + orderId + " SELESAI.");
+                if (typeof tandaiOrderSelesai === 'function') tandaiOrderSelesai(orderId);
+                delete amrJobs[orderId];
+                amrSibuk = false;
+                return;
+            }
+
+            const langkah = job.antrean[job.idx];
+            try {
+                await amrPergiKe(langkah.node, langkah.node, say);
+                if (langkah.isEnd) {
+                    say("Order " + orderId + " SELESAI. Robot di " + langkah.node + ".");
+                    if (typeof tandaiOrderSelesai === 'function') tandaiOrderSelesai(orderId);
+                    delete amrJobs[orderId];
+                    amrSibuk = false;
+                } else {
+                    say("Robot di " + langkah.node + ". Menunggu operator menyelesaikan tugas...");
+                    // robot DIAM di rak. Lanjut hanya saat lapor dari PtL.
+                }
+            } catch (e) {
+                say("Gagal menuju " + langkah.node + ": " + e.message);
+                delete amrJobs[orderId];
+                amrSibuk = false;
+            }
+        }
+
+        // Tandai order selesai (dipanggil saat robot sampai di Base/Stage)
+        function tandaiOrderSelesai(orderId) {
+            ubahStatusOrder(orderId, 'Completed');
+        }
+
+        // tampilkan status AMR di kotak current-node + console
+        function tampilkanStatusAMR(msg) {
+            console.log("[AMR] " + msg);
+            const el = document.getElementById('current-node-value');
+            if (el) el.textContent = msg;
+        }
+
+        // Dipanggil dari handler lapor PtL saat operator selesai di sebuah rak -> lanjut node berikutnya.
+        function amrOperatorSelesai(orderId, rackNode) {
+            const job = amrJobs[orderId];
+            if (!job) return;
+            job.idx += 1;
+            amrKirimNode(orderId);
+        }
+        async function refreshAMR() {
+    // 1. batalkan gerakan yang sedang jalan
+    try {
+        await fetch("/amr/cancel", { method: "POST" });
+        console.log("✓ Navigasi AMR dibatalkan");
+    } catch (e) { console.warn("cancel gagal:", e.message); }
+
+    // 2. bersihkan semua job orkestrator (biar tidak ada segmen menyusul)
+    if (typeof amrJobs !== "undefined") {
+        for (const id in amrJobs) delete amrJobs[id];
+        console.log("✓ Semua job AMR dibersihkan");
+    }
+
+    // 3. cek status
+    try {
+        const r = await fetch("/amr/status");
+        const s = await r.json();
+        console.log("Status AMR sekarang:", s.nav_status, s);
+    } catch (e) { console.warn("status gagal:", e.message); }
+
+    console.log("AMR siap. Kirim SATU perintah saja sekarang.");
+}
+
+async function amrKeNode(node) {
+    node = (node === "Base") ? "Home" : node;   // Base -> Home
+    try {
+        const r = await fetch("/amr/go_to_rack", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rack: node })
+        });
+        const d = await r.json();
+        if (d.status === "error") console.error("❌ Gagal:", d.message);
+        else console.log("✅ AMR menuju " + node + " |", d);
+    } catch (e) { console.error("❌ Tak terhubung:", e.message); }
+}
+
+// Kirim AMR lewat BEBERAPA node berurutan (pakai /follow_waypoints)
+async function amrKeWaypoint(...nodes) {
+    const mapped = nodes.map(n => (n === "Base") ? "Home" : n);
+    try {
+        const r = await fetch("/amr/follow_waypoints", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nodes: mapped })
+        });
+        const d = await r.json();
+        if (d.status === "error") console.error("❌ Gagal:", d.message);
+        else console.log("✅ AMR mengikuti " + mapped.join(" → ") + " |", d);
+    } catch (e) { console.error("❌ Tak terhubung:", e.message); }
+}
+
+// Cek status / posisi AMR
+async function amrStatusCek() {
+    const r = await fetch("/amr/status");
+    console.log(await r.json());
+}
+
+// Batalkan gerakan AMR
+async function amrBatal() {
+    const r = await fetch("/amr/cancel", { method: "POST" });
+    console.log(await r.json());
+}
+    </script>
+</body>
+
+</html>
